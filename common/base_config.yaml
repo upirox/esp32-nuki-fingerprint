@@ -1,0 +1,176 @@
+# ==========================================================
+#  ESPHOME BASE TEMPLATE (common/base_config.yaml)
+#  Security, networking and monitoring shared by all ESP32 nodes.
+#
+#  In the device file:
+#    substitutions:
+#      dev_friendly_name: "Box 01"   # suffix of the diagnostic entity names
+#      wifi_power_save: "NONE"       # "LIGHT" if the node uses Bluetooth
+#    packages:
+#      base: !include common/base_config.yaml
+#    api:
+#      encryption:
+#        key: !secret api_key_box01  # a DIFFERENT key for every node
+#
+#  Rules for living together with the device file:
+#  - ota, wifi, captive_portal and API security are handled ONLY by the
+#    package: don't declare them again in the device (except the API key).
+#  - esphome.on_boot is a LIST here: write it as a list in the device too
+#    (- priority: ...), otherwise it replaces this one.
+#
+#  Required secrets (in common/secrets.yaml, next to this file): wifi_ssid,
+#  wifi_password, ap_password (min. 8 characters) + one API key per node.
+# ==========================================================
+
+substitutions:
+  dev_friendly_name: "Box 01"
+  wifi_interval: "60s"
+  # NONE = best responsiveness. Nodes using Bluetooth (e.g. Nuki over BLE)
+  # MUST use LIGHT: with Wi-Fi and BT both active ESP-IDF requires modem
+  # sleep, and with NONE the chip hangs at boot.
+  wifi_power_save: "NONE"
+
+esphome:
+  on_boot:
+    - priority: -100.0
+      then:
+        # the reset reason doesn't change: publish it once at boot
+        - component.update: causa_riavvio
+
+# ---------------- Network ----------------
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: ${wifi_power_save}
+  # Fallback hotspot: only starts if the Wi-Fi can't be reached.
+  # SSID = node name. Always password protected.
+  ap:
+    password: !secret ap_password
+
+captive_portal:
+
+# ---------------- Security ----------------
+# OTA encrypted with the node's API key (replaces the old OTA password)
+ota:
+  - platform: esphome
+    id: ota_esphome
+    encryption:
+
+api:
+  # the node must keep working with Home Assistant down
+  reboot_timeout: 0s
+
+# ---------------- Time ----------------
+time:
+  - platform: sntp
+    id: my_time
+    timezone: "Europe/Rome"
+    servers:
+      - XX.XX.XX.XX      # local NTP server (router on the IoT VLAN): change or remove it
+      - it.pool.ntp.org
+      - pool.ntp.org
+
+# ---------------- Diagnostics ----------------
+debug:
+  update_interval: 60s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "Indirizzo IP ${dev_friendly_name}"
+      id: ip_address
+      entity_category: diagnostic
+    ssid:
+      name: "SSID Wi-Fi ${dev_friendly_name}"
+      id: wifi_ssid
+      entity_category: diagnostic
+
+  - platform: template
+    name: "Causa Ultimo Riavvio ${dev_friendly_name}"
+    id: causa_riavvio
+    icon: "mdi:restart"
+    entity_category: diagnostic
+    update_interval: never        # published by on_boot
+    lambda: |-
+      switch (esp_reset_reason()) {
+        case ESP_RST_POWERON:   return std::string("Power On / Accensione");
+        case ESP_RST_EXT:       return std::string("Pulsante Reset Esterno");
+        case ESP_RST_SW:        return std::string("Riavvio Software (OTA / API)");
+        case ESP_RST_PANIC:     return std::string("Crash Hardware / Eccezione");
+        case ESP_RST_INT_WDT:   return std::string("Watchdog Timer Interno");
+        case ESP_RST_TASK_WDT:  return std::string("Watchdog Task");
+        case ESP_RST_WDT:       return std::string("Watchdog Reset");
+        case ESP_RST_DEEPSLEEP: return std::string("Sveglia da Deep Sleep");
+        case ESP_RST_BROWNOUT:  return std::string("Brownout (Tensione Bassa)");
+        case ESP_RST_SDIO:      return std::string("Reset via SDIO");
+        default:
+          return std::string("Sconosciuto (codice ") +
+                 std::to_string((int) esp_reset_reason()) + ")";
+      }
+
+sensor:
+  - platform: debug
+    loop_time:
+      name: "Tempo Loop CPU ${dev_friendly_name}"
+      id: tempo_loop_cpu
+      unit_of_measurement: "ms"
+      icon: "mdi:speedometer"
+      accuracy_decimals: 1
+      entity_category: diagnostic
+    free:
+      name: "RAM Libera ${dev_friendly_name}"
+      id: ram_libera
+      unit_of_measurement: "B"
+      entity_category: diagnostic
+    block:
+      name: "Blocco RAM Libero Massimo ${dev_friendly_name}"
+      id: blocco_ram_massimo
+      unit_of_measurement: "B"
+      entity_category: diagnostic
+
+  - platform: wifi_signal
+    name: "Wi-Fi Segnale ${dev_friendly_name} (dBm)"
+    id: wifi_segnale_dbm
+    update_interval: ${wifi_interval}
+    entity_category: diagnostic
+
+  - platform: copy
+    source_id: wifi_segnale_dbm
+    name: "Wi-Fi Segnale ${dev_friendly_name} (%)"
+    unit_of_measurement: "%"
+    device_class: ""          # "signal_strength" only accepts dB/dBm in HA
+    accuracy_decimals: 0
+    icon: "mdi:wifi"
+    entity_category: diagnostic
+    filters:
+      - lambda: |-
+          if (x <= -100) return 0;
+          if (x >= -50) return 100;
+          return 2 * (x + 100);
+
+  - platform: uptime
+    name: "Uptime ${dev_friendly_name}"
+    id: system_uptime
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: internal_temperature
+    name: "Temperatura chip"     # name kept as is so existing entities are not recreated
+    update_interval: 60s
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: status
+    name: "Stato Nodo ${dev_friendly_name}"
+    entity_category: diagnostic
+
+button:
+  - platform: restart
+    name: "Riavvia ${dev_friendly_name}"
+    id: restart_button
+    entity_category: config
+  # Reboot into safe mode: Wi-Fi + OTA only, to recover a node that
+  # keeps crashing without removing it and plugging in USB
+  - platform: safe_mode
+    name: "Riavvia in modalita' provvisoria ${dev_friendly_name}"
+    entity_category: config

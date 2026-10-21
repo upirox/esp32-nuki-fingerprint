@@ -1,76 +1,82 @@
 # ============================================================
-#  ESP32 (38 pin) + lettore R503 + OLED SSD1306 -> Nuki via BLE
-#  Lo sblocco avviene in locale sull'ESP32: funziona anche se
-#  Home Assistant o il Wi-Fi sono giu'.
-#  TESTATO FUNZIONANTE CON ESPHOME 2026.9.1 - ISSUE CON 2026.10.1
-#  Collegamenti:
-#   R503  rosso VCC   -> 3V3      OLED 7 pin (SPI)
-#         bianco 3.3VT-> 3V3        GND      -> GND
-#         nero GND    -> GND        VCC      -> 3V3
-#         giallo TX   -> GPIO16     D0 (SCK) -> GPIO18
-#         viola RX    -> GPIO17     D1 (MOSI)-> GPIO23
-#         blu WAKEUP  -> GPIO4      RES      -> GPIO26
+#  ESP32 (38 pin) + R503 fingerprint reader + SSD1306 OLED -> Nuki via BLE
+#  Unlocking happens locally on the ESP32: it keeps working even when
+#  Home Assistant or the Wi-Fi are down.
+#  TESTED WORKING WITH ESPHOME 2026.9.1 - BUILD ISSUE WITH 2026.10.1
+#  (libsodium conflict with the nuki_lock component)
+#
+#  Wiring:
+#   R503  red VCC     -> 3V3      OLED 7 pin (SPI)
+#         white 3.3VT -> 3V3        GND      -> GND
+#         black GND   -> GND        VCC      -> 3V3
+#         yellow TX   -> GPIO16     D0 (SCK) -> GPIO18
+#         purple RX   -> GPIO17     D1 (MOSI)-> GPIO23
+#         blue WAKEUP -> GPIO4      RES      -> GPIO26
 #                                   DC       -> GPIO27
 #                                   CS       -> GPIO5
-#   Buzzer ESTERNO sulla placca, passivo 3 pin (low level trigger)
+#   OUTDOOR buzzer on the plate, passive, 3 pin (low level trigger)
 #         VCC -> 3V3   GND -> GND   I/O -> GPIO25
-#   Buzzer INTERNO accanto all'ESP32 (stesso modello): campanello e sirene
-#         VCC -> VIN (5V, piu' forte)   GND -> GND   I/O -> GPIO21
-#   Striscia WS2812 (8 LED)
-#         +5V -> VIN   GND -> GND   DIN -> GPIO13 (resistenza 330 ohm)
-#   Sensore PIR AM312 (HW-740)
-#         VCC -> 3V3   GND -> GND   OUT -> GPIO34 (+ 100 kOhm verso GND, NON 10 kOhm)
-#   Pulsante campanello (normalmente aperto)
-#         un capo -> GPIO33   altro capo -> GND   (pull-up interno)
-#   Anello LED del pulsante (versione 3-6 V)
+#   INDOOR buzzer next to the ESP32 (same model): doorbell and sirens
+#         VCC -> 3V3   GND -> GND   I/O -> GPIO21
+#   WS2812 strip (8 LEDs)
+#         +5V -> VIN   GND -> GND   DIN -> GPIO13 (330 ohm resistor)
+#   AM312 PIR sensor (HW-740)
+#         VCC -> 3V3   GND -> GND   OUT -> GPIO34 (+ 100 kOhm to GND, NOT 10 kOhm)
+#   Doorbell push button (normally open)
+#         one side -> GPIO33   other side -> GND   (internal pull-up)
+#   Push button LED ring (3-6 V version)
 #         LED+ -> GPIO32      LED- -> GND
-#   Microinterruttore antimanomissione (contatto NA, premuto a placca montata)
-#         un capo -> GPIO19   altro capo -> GND   (pull-up interno)
-#         placca montata = contatto chiuso; placca rimossa o filo tagliato = allarme
-#   Alimentazione di backup (PowerBoost 1000C + 3 x 18650 in parallelo)
-#         rete presente: +5V alimentatore -> 10k -> GPIO36 -> 20k -> GND
-#         batteria:      BAT PowerBoost   -> 100k -> GPIO39 -> 100k -> GND
-#                                            (+ 100 nF tra GPIO39 e GND)
-#         Durante il blackout: striscia al 30%, anello del pulsante spento a
-#         riposo e al 60% quando si accende il display.
+#   Tamper switch (NO contact / reed, closed while the plate is mounted)
+#         one side -> GPIO19   other side -> GND   (internal pull-up)
+#         plate mounted = contact closed; plate removed or wire cut = alarm
+#   Backup power (PowerBoost 1000C + 3 x 18650 in parallel)
+#         mains present: +5V power supply -> 10k -> GPIO36 -> 20k -> GND
+#         battery:       PowerBoost BAT   -> 100k -> GPIO39 -> 100k -> GND
+#                                            (+ 100 nF between GPIO39 and GND)
+#         During a blackout: strip at 30%, push button ring off while idle
+#         and at 60% when the display turns on.
 #
-#  Striscia LED:
-#    verde tenue fisso  = porta chiusa
-#    rosso fisso        = porta sbloccata / aperta
-#    giallo pulsante    = serratura in movimento (apertura/chiusura)
-#    viola pulsante     = serratura inceppata
-#    blu tenue          = Nuki non raggiungibile / stato sconosciuto
-#    rosso lampeggiante = impronta non riconosciuta
-#    rosso pulsante     = ALLARME, lettore bloccato
-#    blu scansione      = registrazione impronta in corso
+#  LED strip:
+#    dim green, steady  = door locked
+#    red, steady        = door unlocked / open
+#    yellow, pulsing    = lock moving (opening/closing)
+#    purple, pulsing    = lock jammed
+#    dim blue           = Nuki unreachable / unknown state
+#    red, blinking      = fingerprint not recognised
+#    red, pulsing       = ALARM, reader locked out
+#    blue, scanning     = fingerprint enrollment in progress
+#
+#  Entity names, on-screen messages and Home Assistant event texts are in
+#  Italian: change them freely (note that renaming an entity changes its
+#  entity_id in Home Assistant).
 # ============================================================
 
 packages:
   base: !include common/base_config.yaml
 
 substitutions:
-  dev_friendly_name: "Ingresso"        # suffisso delle entita' diagnostiche del package
-  wifi_power_save: "LIGHT"             # OBBLIGATORIO: Wi-Fi + Bluetooth (Nuki) insieme
+  dev_friendly_name: "Ingresso"        # suffix of the package's diagnostic entities
+  wifi_power_save: "LIGHT"             # REQUIRED: Wi-Fi and Bluetooth (Nuki) together
   name: nuki-fingerprint
   friendly_name: Nuki Fingerprint
-  # Allarme
-  max_attempts: "3"        # impronte errate consecutive prima dell'allarme
-  lockout_minutes: "15"    # durata del blocco del lettore
-  attempts_reset_minutes: "10"  # azzera gli errori se non ce ne sono altri entro questo tempo
-  # Suoni del buzzer (formato RTTTL: nome:d=durata,o=ottava,b=bpm:note)
-  tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # accesso consentito
-  tone_fail: "ko:d=8,o=5,b=180:d,p,d"                    # impronta rifiutata
-  tone_alarm: "alarm:d=8,o=6,b=200:c,g5,c,g5,c,g5,c,g5,c,g5" # allarme: sirena
-  tone_enroll_start: "enr:d=16,o=6,b=200:a,p,a"          # registrazione avviata
-  tone_enroll_scan: "scan:d=16,o=7,b=200:c"              # scansione ok, togli il dito
-  tone_enroll_done: "done:d=16,o=6,b=160:c,e,g,c7,e7,8g7" # impronta salvata
-  tone_enroll_fail: "efail:d=8,o=6,b=160:g,e,c,4c5"      # registrazione fallita
-  # Colore dell'anello del sensore quando il display e' acceso.
-  # L'R503 ha solo colori fissi: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
-  # WHITE tende al caldo; CYAN e' l'alternativa piu' fredda (bianco-azzurro).
+  # Alarm
+  max_attempts: "3"        # consecutive wrong fingerprints before the alarm
+  lockout_minutes: "15"    # how long the reader stays locked out
+  attempts_reset_minutes: "10"  # reset the error count if no other error happens within this time
+  # Buzzer sounds (RTTTL format: name:d=duration,o=octave,b=bpm:notes)
+  tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # access granted
+  tone_fail: "ko:d=8,o=5,b=180:d,p,d"                    # fingerprint rejected
+  tone_alarm: "alarm:d=8,o=6,b=200:c,g5,c,g5,c,g5,c,g5,c,g5" # alarm: siren
+  tone_enroll_start: "enr:d=16,o=6,b=200:a,p,a"          # enrollment started
+  tone_enroll_scan: "scan:d=16,o=7,b=200:c"              # scan ok, lift your finger
+  tone_enroll_done: "done:d=16,o=6,b=160:c,e,g,c7,e7,8g7" # fingerprint saved
+  tone_enroll_fail: "efail:d=8,o=6,b=160:g,e,c,4c5"      # enrollment failed
+  # Colour of the sensor ring while the display is on.
+  # The R503 only has fixed colours: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
+  # WHITE looks warm; CYAN is the cooler alternative (bluish white).
   aura_presence_color: BLUE
-  # Campanello (solo DENTRO): doppio ding-dong. Ottava 7 (2-2,6 kHz): e' la zona
-  # in cui i buzzer passivi risuonano e suonano piu' forte.
+  # Doorbell (INDOOR only): double ding-dong. Octave 7 (2-2.6 kHz) is where
+  # passive buzzers resonate and sound loudest.
   tone_bell: "bell:d=4,o=7,b=100:e,2c,4p,e,2c"
 
 esphome:
@@ -79,32 +85,32 @@ esphome:
   on_boot:
     - priority: -100
       then:
-        # Reimposta l'anello del sensore: l'R503 resta alimentato durante
-        # l'OTA e ricorderebbe l'ultimo colore impostato (es. rosso di allarme)
+        # Reset the sensor ring: the R503 stays powered during OTA and
+        # would keep the last colour it was given (e.g. alarm red)
         - delay: 2s
         - globals.set: { id: booted, value: "true" }
         - logger.log:
             level: WARN
-            format: "Stato ripristinato all'avvio: blocco impronte=%s, errori=%d, manomissione=%s"
+            format: "State restored at boot: fingerprint lockout=%s, errors=%d, tamper=%s"
             args: [ 'id(locked_out) ? "SI" : "no"', 'id(failed_attempts)', 'id(tamper_latched) ? "SI" : "no"' ]
-        # Placca gia' aperta all'avvio (o filo scollegato): manomissione
+        # Plate already open at boot (or wire disconnected): tamper
         - if:
             condition:
               binary_sensor.is_on: plate_open
             then:
               - script.execute: tamper_trigger
-        # Allarme impronte in corso prima del riavvio: il blocco riparte
-        # da capo (${lockout_minutes} min), cosi' staccare la corrente non lo accorcia
+        # Fingerprint alarm active before the reboot: the lockout starts
+        # over (${lockout_minutes} min), so cutting the power can't shorten it
         - if:
             condition:
               lambda: "return id(locked_out);"
             then:
               - logger.log:
                   level: WARN
-                  format: "Riavvio durante l'allarme impronte: blocco ripristinato"
+                  format: "Rebooted during the fingerprint alarm: lockout restored"
               - script.execute: alarm_lockout
             else:
-              # errori gia' contati: riparte il timer che li azzera
+              # errors already counted: restart the timer that clears them
               - if:
                   condition:
                     lambda: "return id(failed_attempts) > 0;"
@@ -114,24 +120,24 @@ esphome:
         - script.execute: restore_strip
         - script.execute: screen_wake
 
-# I valori da ricordare (blocco, errori, manomissione) si scrivono in
-# flash SUBITO invece che ogni minuto: uno stacco di corrente appena
-# dopo l'allarme non li perde. Si scrive solo quando un valore cambia.
+# Values to remember (lockout, errors, tamper) are written to flash
+# IMMEDIATELY instead of once a minute, so a power cut right after the
+# alarm doesn't lose them. Flash is only written when a value changes.
 preferences:
   flash_write_interval: 0s
 
 esp32:
   board: esp32dev
   framework:
-    type: esp-idf          # richiesto dal componente nuki_lock
+    type: esp-idf          # required by the nuki_lock component
 
 logger:
 
-# wifi, rete di emergenza, captive_portal, ota e diagnostica: dal package base
+# wifi, fallback hotspot, captive_portal, ota and diagnostics: from the base package
 api:
   encryption:
     key: !secret api_key
-  # Azioni richiamabili da Home Assistant per gestire le impronte
+  # Actions callable from Home Assistant to manage fingerprints
   actions:
     - action: enroll
       variables:
@@ -154,13 +160,13 @@ api:
     - action: delete_all
       then:
         - fingerprint_grow.delete_all:
-    # Annulla l'allarme e sblocca il lettore prima della scadenza
+    # Cancel the alarm and unlock the reader before the timeout
     - action: reset_alarm
       then:
         - script.execute: alarm_clear
-    # Suona una melodia RTTTL sul buzzer interno, es. da un'automazione:
-    #   action: esphome.<nome_dispositivo>_suona_interno
-    #   data: { melodia: "bip:d=8,o=7,b=120:c,p,c" }
+    # Play an RTTTL tune on the indoor buzzer, e.g. from an automation:
+    #   action: esphome.<device_name>_suona_interno
+    #   data: { melodia: "beep:d=8,o=7,b=120:c,p,c" }
     - action: suona_interno
       variables:
         melodia: string
@@ -168,7 +174,7 @@ api:
         - rtttl.play:
             id: buzzer_in
             rtttl: !lambda "return melodia;"
-    # Ferma qualsiasi suono del buzzer interno
+    # Stop any sound on the indoor buzzer
     - action: ferma_interno
       then:
         - rtttl.stop:
@@ -182,15 +188,15 @@ lock:
   - platform: nuki_lock
     id: nuki
     name: Nuki Lock
-    # PIN della serratura (quello impostato nell'app Nuki):
-    #  - Smart Lock 3.0: facoltativo, 4 cifre (serve solo per cambiare
-    #    le impostazioni della serratura da Home Assistant)
-    #  - 5th Gen / Ultra / Go / Pro: obbligatorio, 6 cifre
-    # Per usarlo, aggiungi  nuki_pin: "1234"  in secrets.yaml e togli il #
+    # Lock security PIN (the one set in the Nuki app):
+    #  - Smart Lock 3.0: optional, 4 digits (only needed to change the
+    #    lock settings from Home Assistant)
+    #  - 5th Gen / Ultra / Go / Pro: required, 6 digits
+    # To use it, add  nuki_pin: "1234"  to secrets.yaml and remove the #
     # security_pin: !secret nuki_pin
     event: "none"
-    # --- Accoppiamento e stato collegamento ---
-    pairing_mode:                 # interruttore in HA per avviare l'accoppiamento
+    # --- Pairing and connection state ---
+    pairing_mode:                 # switch in HA to start pairing
       name: Accoppiamento Nuki
     connected:
       name: Nuki connesso
@@ -198,24 +204,24 @@ lock:
       name: Nuki accoppiato
     unpair:
       name: Disaccoppia Nuki
-    # --- Diagnostica utile ---
+    # --- Useful diagnostics ---
     battery_level:
       name: Batteria Nuki
     battery_critical:
       name: Batteria Nuki scarica
     bt_signal_strength:
       name: Segnale Bluetooth Nuki
-    door_sensor_state:            # testo: chiusa / aperta / calibrazione...
+    door_sensor_state:            # text: closed / open / calibrating...
       name: Stato porta
-    door_sensor:                  # aperta/chiusa con icona che cambia (per badge e automazioni)
+    door_sensor:                  # open/closed with changing icon (for badges and automations)
       name: Porta ingresso
       device_class: door
-    # Frequenza con cui il Nuki si annuncia via Bluetooth:
-    # piu' frequente = l'ESP32 lo raggiunge prima, ma consuma piu' batteria
+    # How often the Nuki advertises over Bluetooth:
+    # more often = the ESP32 reaches it faster, but it drains the battery more
     advertising_mode:
       name: Nuki Advertising Mode
 
-# ---------------- Striscia LED ----------------
+# ---------------- LED strip ----------------
 light:
   - platform: esp32_rmt_led_strip
     id: strip
@@ -247,14 +253,14 @@ light:
           move_interval: 80ms
           scan_width: 2
 
-  # Anello luminoso del pulsante: tenue a riposo, pieno quando
-  # qualcuno si avvicina o tocca il lettore, lampeggiante quando suona
+  # Push button LED ring: dim while idle, full when someone comes close
+  # or touches the reader, blinking while the doorbell rings
   - platform: monochromatic
     id: ring
     name: Anello pulsante campanello
     output: ring_out
     default_transition_length: 300ms
-    restore_mode: ALWAYS_OFF          # all'avvio lo accende on_boot
+    restore_mode: ALWAYS_OFF          # turned on by on_boot
     effects:
       - strobe:
           name: Lampeggio
@@ -265,10 +271,10 @@ light:
             - state: false
               duration: 150ms
 
-# Aggiorna la striscia ogni volta che cambia lo stato del Nuki
-# (comandi da impronta, da HA, dall'app o a mano sulla serratura)
+# Refresh the strip whenever the Nuki state changes
+# (commands from fingerprint, HA, the app or by hand on the lock)
 interval:
-  # Stato antimanomissione: pubblica solo quando cambia (niente log/traffico inutili)
+  # Tamper status: publish only on change (no useless logs/traffic)
   - interval: 500ms
     then:
       - lambda: |-
@@ -292,30 +298,30 @@ interval:
           if (s != last) {
             last = s;
             if (!id(fp_enrolling).state) id(restore_strip).execute();
-            id(screen_wake).execute();       // ogni cambio di stato riaccende il display
+            id(screen_wake).execute();       // every state change wakes the display
           }
 
-# ---------------- Buzzer ----------------
+# ---------------- Buzzers ----------------
 output:
-  # Ogni uscita PWM ha un canale su un TIMER DIVERSO (canali 0, 2, 4):
-  # i canali 0-1, 2-3, 4-5 condividono il timer e le melodie di un buzzer,
-  # cambiando frequenza, farebbero ronzare l'altro senza fermarsi.
+  # Each PWM output gets a channel on a DIFFERENT TIMER (channels 0, 2, 4):
+  # channels 0-1, 2-3, 4-5 share a timer, and a tune on one buzzer, by
+  # changing the frequency, would make the other one buzz non-stop.
   - platform: ledc
     id: buzzer_out
     channel: 0
     pin:
       number: GPIO25
-      inverted: true     # modulo "low level trigger": a riposo il pin resta alto
+      inverted: true     # "low level trigger" module: the pin idles high
 
-  # Buzzer interno, accanto all'ESP32
+  # Indoor buzzer, next to the ESP32
   - platform: ledc
     id: buzzer_in_out
     channel: 2
     pin:
       number: GPIO21
-      inverted: true     # stesso modulo "low level trigger"
+      inverted: true     # same "low level trigger" module
 
-  # Anello LED del pulsante campanello, pilotato direttamente dal GPIO
+  # Doorbell push button LED ring, driven straight from the GPIO
   - platform: ledc
     id: ring_out
     channel: 4
@@ -323,36 +329,36 @@ output:
     frequency: 1000Hz
 
 rtttl:
-  # Esterno (placca): conferme per chi e' alla porta e sirena dissuasiva
+  # Outdoor (plate): feedback for whoever is at the door, deterrent siren
   - id: buzzer
     output: buzzer_out
-    gain: 50%            # volume: 50% = massimo (duty cycle); sotto = piu' piano
-  # Interno (accanto all'ESP32): campanello e allarmi per chi e' in casa
+    gain: 50%            # volume: 50% = maximum (duty cycle); lower = quieter
+  # Indoor (next to the ESP32): doorbell and alarms for whoever is home
   - id: buzzer_in
     output: buzzer_in_out
-    # gain = duty cycle del PWM: 50% e' il volume MASSIMO per un buzzer
-    # passivo. A 100% l'uscita resta fissa (nessuna oscillazione) e si
-    # sentono solo crepitii ai cambi di nota.
+    # gain = PWM duty cycle: 50% is the MAXIMUM volume for a passive
+    # buzzer. At 100% the output stays constant (no oscillation) and you
+    # only hear clicks at note changes.
     gain: 50%
 
-# ---------------- Stato e messaggi ----------------
+# ---------------- State and messages ----------------
 globals:
-  # Blocco per manomissione: resta attivo anche dopo un riavvio,
-  # finche' non lo ripristini da Home Assistant
+  # Tamper lockout: stays active across reboots until it is
+  # reset from Home Assistant
   - id: tamper_latched
     type: bool
     restore_value: true
     initial_value: "false"
-  - id: doorbell_ringing       # anello in lampeggio: screen_wake non lo tocca
+  - id: doorbell_ringing       # ring blinking: screen_wake leaves it alone
     type: bool
     initial_value: "false"
-  # Diventa true a fine avvio: evita che l'interruttore, ripristinando il
-  # suo stato durante l'avvio, usi display e sensore non ancora pronti
+  # Becomes true at the end of boot: stops the switch, while restoring
+  # its state during boot, from using the display and sensor too early
   - id: booted
     type: bool
     initial_value: "false"
-  # Contatore errori e blocco sopravvivono a un riavvio o a uno stacco
-  # di corrente: togliere l'alimentazione non sblocca il lettore
+  # Error counter and lockout survive a reboot or a power cut:
+  # removing power does not unlock the reader
   - id: failed_attempts
     type: int
     restore_value: true
@@ -361,7 +367,7 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
-  - id: screen_on              # display acceso: l'anello del sensore resta bianco
+  - id: screen_on              # display on: the sensor ring stays lit
     type: bool
     initial_value: "false"
   - id: msg1
@@ -372,7 +378,7 @@ globals:
     initial_value: '"sul lettore"'
 
 script:
-  # Manomissione: lettore bloccato, allarme, notifica tramite HA
+  # Tamper: reader locked, alarm, notification through HA
   - id: tamper_trigger
     mode: single
     then:
@@ -381,17 +387,17 @@ script:
       - script.execute: aura_idle
       - script.execute: screen_wake
       - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
-      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # avvisa anche in casa
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
           id: last_event
           state: "MANOMISSIONE: placca rimossa, lettore bloccato"
       - logger.log:
           level: WARN
-          format: "Manomissione rilevata: lettore bloccato fino al ripristino da HA"
+          format: "Tamper detected: reader locked until reset from HA"
 
-  # Stato "di riposo" dell'anello del sensore:
-  #   allarme -> rosso fisso | lettore disattivato -> rosso lampeggiante
-  #   display acceso -> bianco fisso (stessa durata) | altrimenti spento
+  # Idle state of the sensor ring:
+  #   alarm -> steady red | reader disabled -> blinking red
+  #   display on -> steady aura_presence_color (same duration) | otherwise off
   - id: aura_idle
     mode: restart
     then:
@@ -413,12 +419,12 @@ script:
                       state: FLASHING
                       speed: 100
                       color: RED
-                      count: 0          # 0 = all'infinito
+                      count: 0          # 0 = forever
                 else:
                   - if:
                       condition:
-                        # display acceso (e nessuna registrazione in corso):
-                        # anello bianco fisso, invita ad appoggiare il dito
+                        # display on (and no enrollment in progress):
+                        # steady ring, invites the user to place a finger
                         lambda: "return id(screen_on) && !id(fp_enrolling).state;"
                       then:
                         - fingerprint_grow.aura_led_control:
@@ -433,18 +439,18 @@ script:
                             color: BLUE
                             count: 0
 
-  # Accende il display e lo spegne dopo 30 s di inattivita'.
-  # Ogni nuova chiamata riparte da zero (mode: restart).
-  # Durante l'allarme il display resta acceso.
+  # Turns the display on and off again after 30 s of inactivity.
+  # Every new call restarts the countdown (mode: restart).
+  # During an alarm the display stays on.
   - id: screen_wake
     mode: restart
     then:
       - lambda: |-
           id(oled).turn_on();
           id(oled).update();
-      # display appena acceso (era spento): anello del sensore bianco.
-      # Se era gia' acceso non si tocca, per non interrompere i lampeggi
-      # di conferma o di errore in corso.
+      # display just turned on (it was off): light the sensor ring.
+      # If it was already on, leave the ring alone so confirmation or
+      # error flashes in progress are not cut short.
       - if:
           condition:
             lambda: "return !id(screen_on);"
@@ -471,10 +477,10 @@ script:
                 condition:
                   lambda: "return !id(fp_enrolling).state;"
                 then:
-                  - script.execute: aura_idle    # anello del sensore spento
+                  - script.execute: aura_idle    # sensor ring off
 
-  # Anello del pulsante a riposo (display spento): 25% con la rete,
-  # spento durante il blackout per risparmiare batteria
+  # Push button ring at rest (display off): 25% on mains power,
+  # off during a blackout to save battery
   - id: ring_rest
     mode: restart
     then:
@@ -486,7 +492,7 @@ script:
           else:
             - light.turn_off: ring
 
-  # Colore della striscia in base allo stato di allarme e del Nuki
+  # Strip colour from the alarm and Nuki state
   - id: restore_strip
     mode: restart
     then:
@@ -495,32 +501,32 @@ script:
           float r = 0, g = 0, b = 0, br = 0.6f;
           std::string fx = "None";
           if (id(locked_out)) {
-            r = 1; br = 1.0f; fx = "Pulsazione";               // allarme
+            r = 1; br = 1.0f; fx = "Pulsazione";               // alarm
           } else {
             switch (id(nuki).state) {
               case lock::LOCK_STATE_LOCKED:
-                g = 1; br = 0.25f; break;                      // chiusa: verde tenue (tutto a posto)
+                g = 1; br = 0.25f; break;                      // locked: dim green (all good)
               case lock::LOCK_STATE_UNLOCKED:
               case lock::LOCK_STATE_OPEN:
               case lock::LOCK_STATE_OPENING:
-                r = 1; break;                                  // sbloccata: rosso (attenzione)
+                r = 1; break;                                  // unlocked: red (attention)
               case lock::LOCK_STATE_LOCKING:
               case lock::LOCK_STATE_UNLOCKING:
-                r = 1; g = 0.7f; fx = "Pulsazione"; break;     // in movimento
+                r = 1; g = 0.7f; fx = "Pulsazione"; break;     // moving
               case lock::LOCK_STATE_JAMMED:
-                r = 0.7f; b = 1; fx = "Pulsazione"; break;     // inceppata
+                r = 0.7f; b = 1; fx = "Pulsazione"; break;     // jammed
               default:
-                b = 1; br = 0.15f; break;                      // sconosciuto
+                b = 1; br = 0.15f; break;                      // unknown
             }
           }
-          // a batteria: striscia al 30% (l'allarme resta pieno)
+          // on battery: strip at 30% (the alarm stays at full brightness)
           if (!id(mains_ok).state && !id(locked_out)) br *= 0.3f;
           call.set_rgb(r, g, b);
           call.set_brightness(br);
           call.set_effect(fx);
           call.perform();
 
-  # Lampeggio rosso per 1,5 s, poi ritorno al colore di stato
+  # Red blink for 1.5 s, then back to the state colour
   - id: flash_error
     mode: restart
     then:
@@ -530,8 +536,8 @@ script:
       - delay: 1500ms
       - script.execute: restore_strip
 
-  # Azzera il contatore degli errori se per ${attempts_reset_minutes} minuti
-  # non ci sono altri tentativi falliti (ogni errore fa ripartire il timer)
+  # Reset the error counter if there are no further failed attempts for
+  # ${attempts_reset_minutes} minutes (every error restarts the timer)
   - id: attempts_reset
     mode: restart
     then:
@@ -541,35 +547,35 @@ script:
             lambda: "return !id(locked_out) && id(failed_attempts) > 0;"
           then:
             - globals.set: { id: failed_attempts, value: "0" }
-            - logger.log: "Contatore impronte errate azzerato"
+            - logger.log: "Wrong fingerprint counter reset"
 
-  # Allarme: lettore bloccato per ${lockout_minutes} minuti
+  # Alarm: reader locked out for ${lockout_minutes} minutes
   - id: alarm_lockout
     mode: single
     then:
       - globals.set: { id: locked_out, value: "true" }
       - logger.log:
           level: WARN
-          format: "Allarme impronte: blocco attivato e salvato in memoria"
+          format: "Fingerprint alarm: lockout enabled and saved to flash"
       - script.stop: show_msg
       - script.stop: flash_error
       - script.execute: restore_strip
       - script.execute: screen_wake
-      - fingerprint_grow.aura_led_control:   # anello del sensore rosso fisso
+      - fingerprint_grow.aura_led_control:   # sensor ring steady red
           state: ALWAYS_ON
           speed: 0
           color: RED
           count: 0
       - component.update: oled
       - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
-      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # avvisa anche in casa
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
           id: last_event
           state: "ALLARME: ${max_attempts} impronte errate, lettore bloccato"
       - delay: ${lockout_minutes}min
       - script.execute: alarm_clear
 
-  # Fine allarme (alla scadenza o da Home Assistant con reset_alarm)
+  # End of alarm (on timeout, or from Home Assistant with reset_alarm)
   - id: alarm_clear
     mode: single
     then:
@@ -578,21 +584,21 @@ script:
       - globals.set: { id: failed_attempts, value: "0" }
       - script.execute: aura_idle
       - script.execute: restore_strip
-      - script.execute: screen_wake          # riparte il timeout di 30 s
+      - script.execute: screen_wake          # restart the 30 s timeout
       - text_sensor.template.publish:
           id: last_event
           state: "Allarme rientrato"
 
-  # Campanello: suono di conferma, messaggio e evento per HA.
-  # mode: single + attesa finale = una sola suonata ogni 5 s
-  # anche se il pulsante viene premuto a ripetizione.
+  # Doorbell: chime, on-screen message and event for HA.
+  # mode: single + final delay = at most one ring every 5 s,
+  # even if the button is pressed repeatedly.
   - id: doorbell_ring
     mode: single
     then:
       - globals.set: { id: doorbell_ringing, value: "true" }
       - script.execute: screen_wake
       - light.turn_on: { id: ring, effect: Lampeggio }
-      - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }    # solo dentro: doppio ding-dong
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }    # indoor only: double ding-dong
       - event.trigger:
           id: doorbell_event
           event_type: "premuto"
@@ -616,7 +622,7 @@ script:
             - script.execute: ring_rest
       - delay: 2s
 
-  # Mostra un messaggio per 4 secondi, poi torna a quello di attesa
+  # Show a message for 4 seconds, then go back to the idle one
   - id: show_msg
     mode: restart
     parameters:
@@ -632,15 +638,15 @@ script:
           id(msg1) = "Appoggia il dito";
           id(msg2) = "sul lettore";
           id(oled).update();
-      # finiti i lampeggi di conferma/errore, l'anello torna allo stato di
-      # riposo (bianco se c'e' ancora qualcuno davanti)
+      # once confirmation/error flashes are over, the ring goes back to its
+      # idle state (lit if someone is still in front of the door)
       - if:
           condition:
             lambda: "return !id(fp_enrolling).state;"
           then:
             - script.execute: aura_idle
 
-# ---------------- Display OLED ----------------
+# ---------------- OLED display ----------------
 spi:
   clk_pin: GPIO18       # D0
   mosi_pin: GPIO23      # D1
@@ -656,17 +662,17 @@ font:
 display:
   - platform: ssd1306_spi
     id: oled
-    model: "SSD1306 128x64"   # se l'immagine e' spostata di 2 px: "SH1106 128x64"
-    # CS collegato a GPIO5 (un filo in piu' nel cavo verso la placca).
-    # Con CS fisso a GND il display non si accendeva: il CS serve a
-    # risincronizzare il display a ogni comando.
-    # GPIO5 e' un pin di strapping: il warning in compilazione e' normale.
+    model: "SSD1306 128x64"   # if the image is shifted by 2 px: "SH1106 128x64"
+    # CS wired to GPIO5 (one more wire in the cable to the plate).
+    # With CS tied to GND the display never turned on: CS resynchronises
+    # the display on every command.
+    # GPIO5 is a strapping pin: the compile warning is expected.
     cs_pin:
       number: GPIO5
       ignore_strapping_warning: true
     dc_pin: GPIO27
     reset_pin: GPIO26
-    data_rate: 1MHz           # SPI rallentato per i 2 m di cavo
+    data_rate: 1MHz           # slower SPI for the 2 m cable
     update_interval: 2s
     lambda: |-
       if (id(tamper_latched)) {
@@ -675,7 +681,7 @@ display:
         it.print(64, 29, id(font_small), TextAlign::CENTER, "Sistema bloccato");
         it.print(64, 42, id(font_small), TextAlign::CENTER, "Accesso disabilitato");
       } else if (id(locked_out)) {
-        // Banda invertita in alto con la scritta ALLARME
+        // Inverted band at the top with the ALARM label
         it.filled_rectangle(0, 0, 128, 19);
         it.print(64, 10, id(font_big), COLOR_OFF, TextAlign::CENTER, "! ALLARME !");
         it.print(64, 29, id(font_small), TextAlign::CENTER, "Sistema bloccato");
@@ -684,12 +690,12 @@ display:
         it.print(64, 18, id(font_big), TextAlign::CENTER, "Disattivato");
         it.print(64, 38, id(font_small), TextAlign::CENTER, "Usa chiave o app");
       } else if (id(msg1) != "Appoggia il dito") {
-        // messaggio temporaneo (Benvenuto, Non riconosciuto, Din don...)
+        // temporary message (welcome, not recognised, doorbell...)
         it.print(64, 18, id(font_big), TextAlign::CENTER, id(msg1).c_str());
         it.print(64, 38, id(font_small), TextAlign::CENTER, id(msg2).c_str());
       } else {
-        // messaggio di attesa coerente con lo stato della serratura:
-        // "Appoggia il dito" solo quando l'impronta serve davvero
+        // idle message matching the lock state:
+        // "place your finger" only when a fingerprint is actually needed
         const char *a = "Appoggia il dito", *b = "sul lettore";
         switch (id(nuki).state) {
           case lock::LOCK_STATE_UNLOCKING:
@@ -702,12 +708,12 @@ display:
             a = "Chiusura..."; b = "attendi un istante"; break;
           case lock::LOCK_STATE_JAMMED:
             a = "Inceppata"; b = "usa la chiave"; break;
-          default: break;   // chiusa o stato sconosciuto: serve l'impronta
+          default: break;   // locked or unknown state: a fingerprint is needed
         }
         it.print(64, 18, id(font_big), TextAlign::CENTER, a);
         it.print(64, 38, id(font_small), TextAlign::CENTER, b);
       }
-      // Riga di stato in basso: stato serratura
+      // Bottom status line: lock state
       const char *st = "Nuki: ?";
       switch (id(nuki).state) {
         case lock::LOCK_STATE_LOCKED:    st = "Porta chiusa"; break;
@@ -720,22 +726,22 @@ display:
       it.line(0, 52, 127, 52);
       it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, st);
 
-# ---------------- Lettore impronte ----------------
+# ---------------- Fingerprint reader ----------------
 uart:
-  rx_pin: GPIO16   # <- giallo (TX del sensore)
-  tx_pin: GPIO17   # -> viola  (RX del sensore)
+  rx_pin: GPIO16   # <- yellow (sensor TX)
+  tx_pin: GPIO17   # -> purple (sensor RX)
   baud_rate: 57600
 
 fingerprint_grow:
   id: fp
-  sensing_pin: GPIO4          # blu (WAKEUP): basso quando c'e' un dito
-  # --- PASSWORD DEL SENSORE (protezione contro la sostituzione) ---
-  # La password e' gia' stata scritta nel sensore: qui resta attiva
-  # SOLO "password". Il valore (decimale, senza virgolette) sta in
-  # secrets.yaml come  fp_password: 1234567890
-  # "new_password" serve solo per cambiarla: NON riattivarla.
+  sensing_pin: GPIO4          # blue (WAKEUP): low while a finger is present
+  # --- SENSOR PASSWORD (protection against swapping the sensor) ---
+  # The password has already been written to the sensor: ONLY
+  # "password" stays active here. The value (decimal, unquoted) lives in
+  # secrets.yaml as  fp_password: 1234567890
+  # "new_password" is only used to change it: do NOT re-enable it.
   password: !secret fp_password
-  # Il dito sul sensore (WAKEUP) riaccende il display
+  # A finger on the sensor (WAKEUP) wakes the display
   on_finger_scan_start:
     - script.execute: screen_wake
   on_finger_scan_matched:
@@ -746,7 +752,7 @@ fingerprint_grow:
           - globals.set:
               id: failed_attempts
               value: "0"
-          - fingerprint_grow.aura_led_control:   # impronta accettata: respiro verde
+          - fingerprint_grow.aura_led_control:   # fingerprint accepted: green breathing
               state: BREATHING
               speed: 200
               color: GREEN
@@ -756,21 +762,21 @@ fingerprint_grow:
               l1: "Benvenuto"
               l2: "Apertura in corso"
           - rtttl.play: { id: buzzer, rtttl: "${tone_ok}" }
-          # Scegli UNO dei due:
-          - lock.unlock: nuki       # ruota il cilindro (sblocca)
-          # - lock.open: nuki       # sblocca + trattiene lo scrocco (apre la porta)
+          # Pick ONE of the two:
+          - lock.unlock: nuki       # turns the cylinder (unlock)
+          # - lock.open: nuki       # unlock + pull the latch (opens the door)
           - text_sensor.template.publish:
               id: last_event
               state: !lambda 'return "Sbloccato da impronta #" + to_string(finger_id);'
         else:
-          # impronta valida ma lettore in allarme/disattivato, o confidenza bassa
+          # valid fingerprint but reader in alarm/disabled, or low confidence
           - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
           - script.execute: screen_wake
           - if:
               condition:
                 lambda: "return !id(locked_out) && !id(sw_reader_off).state;"
               then:
-                # confidenza sotto soglia: non conta come errore, chiede di riprovare
+                # confidence below threshold: not counted as an error, asks to retry
                 - script.execute:
                     id: show_msg
                     l1: "Lettura incerta"
@@ -778,13 +784,13 @@ fingerprint_grow:
                 - text_sensor.template.publish:
                     id: last_event
                     state: !lambda 'return "Impronta #" + to_string(finger_id) + " con confidenza bassa (" + to_string(confidence) + ")";'
-  # Dito appoggiato male o tolto troppo presto: non conta come errore
+  # Finger misplaced or lifted too early: not counted as an error
   on_finger_scan_misplaced:
     - script.execute:
         id: show_msg
         l1: "Dito spostato"
         l2: "Tienilo fermo"
-  # Immagine illeggibile (dito asciutto, bagnato, sporco): non conta come errore
+  # Unreadable image (dry, wet or dirty finger): not counted as an error
   on_finger_scan_invalid:
     - script.execute:
         id: show_msg
@@ -795,7 +801,7 @@ fingerprint_grow:
         condition:
           lambda: "return id(locked_out) || id(sw_reader_off).state;"
         then:
-          # allarme o lettore disattivato: nessun conteggio, solo rifiuto
+          # alarm or reader disabled: no counting, just reject
           - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
           - script.execute: screen_wake
         else:
@@ -819,7 +825,7 @@ fingerprint_grow:
               condition:
                 lambda: "return id(failed_attempts) >= ${max_attempts};"
               then:
-                - delay: 1600ms           # lascia finire suono e lampeggio di rifiuto
+                - delay: 1600ms           # let the reject sound and blink finish
                 - script.execute: alarm_lockout
   on_enrollment_scan:
     - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_scan}" }
@@ -865,9 +871,9 @@ fingerprint_grow:
     - script.execute: flash_error
 
 sensor:
-  # --- Batteria di backup -------------------------------------------
-  # Tensione della cella letta su GPIO39 attraverso il partitore 100k/100k
-  # (meta' tensione). Media su 6 letture: un valore al minuto.
+  # --- Backup battery ----------------------------------------------
+  # Cell voltage read on GPIO39 through the 100k/100k divider (half the
+  # voltage). Average of 6 readings: one value per minute.
   - platform: adc
     id: batt_voltage
     name: Tensione batteria
@@ -879,15 +885,15 @@ sensor:
     device_class: voltage
     entity_category: diagnostic
     filters:
-      - multiply: 2.0                 # partitore 1:2
+      - multiply: 2.0                 # 1:2 divider
       - sliding_window_moving_average:
           window_size: 6
           send_every: 6
     on_value:
       - component.update: batt_percent
 
-  # Percentuale stimata dalla curva di scarica di una cella Li-ion.
-  # Con la rete presente la cella e' in carica: la percentuale e' indicativa.
+  # Percentage estimated from a Li-ion cell discharge curve.
+  # On mains power the cell is charging: the percentage is only indicative.
   - platform: template
     id: batt_percent
     name: Batteria
@@ -919,15 +925,15 @@ sensor:
       name: Ultima confidenza
 
 binary_sensor:
-  # Corrente di rete sulla linea dell'ESP32 (5 V dell'alimentatore, prima
-  # del PowerBoost). on = rete presente, off = blackout: si va a batteria.
-  # Il ritardo ignora i cali brevissimi e i piccoli disturbi che l'ADC su
-  # GPIO39 puo' indurre su GPIO36 (difetto noto dell'ESP32).
+  # Mains power on the ESP32's line (5 V from the power supply, before
+  # the PowerBoost). on = mains present, off = blackout: running on battery.
+  # The delay ignores very short dips and the small glitches the ADC on
+  # GPIO39 can induce on GPIO36 (known ESP32 erratum).
   - platform: gpio
     id: mains_ok
     name: Alimentazione di rete
     device_class: power
-    pin: GPIO36                      # solo ingresso, pull-down = R 20k esterna
+    pin: GPIO36                      # input only, pull-down = external 20k resistor
     filters:
       - delayed_on: 2s
       - delayed_off: 2s
@@ -941,8 +947,8 @@ binary_sensor:
                 state: "Corrente assente: funzionamento a batteria"
             - logger.log:
                 level: WARN
-                format: "Rete assente: modalita' risparmio"
-      # striscia e anello si adeguano sempre, anche durante l'avvio
+                format: "Mains power lost: power saving mode"
+      # strip and ring always follow, even during boot
       - script.execute: restore_strip
       - if:
           condition:
@@ -957,7 +963,7 @@ binary_sensor:
             - text_sensor.template.publish:
                 id: last_event
                 state: "Corrente di rete tornata"
-      # striscia e anello si adeguano sempre, anche durante l'avvio
+      # strip and ring always follow, even during boot
       - script.execute: restore_strip
       - if:
           condition:
@@ -965,7 +971,7 @@ binary_sensor:
           then:
             - script.execute: ring_rest
 
-  # Stato istantaneo del microinterruttore (on = placca rimossa o filo tagliato)
+  # Live tamper switch state (on = plate removed or wire cut)
   - platform: gpio
     id: plate_open
     name: Placca rimossa
@@ -974,7 +980,7 @@ binary_sensor:
       number: GPIO19
       mode: INPUT_PULLUP
     filters:
-      - delayed_on: 300ms          # ignora vibrazioni e colpi alla porta
+      - delayed_on: 300ms          # ignore vibrations and knocks on the door
       - delayed_off: 300ms
     on_press:
       - if:
@@ -983,38 +989,38 @@ binary_sensor:
           then:
             - script.execute: tamper_trigger
 
-  # Manomissione memorizzata: resta "on" fino al ripristino da HA.
-  # Da usare nelle automazioni per le notifiche.
+  # Latched tamper: stays "on" until reset from HA.
+  # Use it in automations for notifications.
   - platform: template
     id: tamper_alarm
     name: Manomissione placca
     device_class: tamper
     lambda: "return id(tamper_latched);"
 
-  # Allarme da usare nelle automazioni di HA (notifiche ai cellulari)
+  # Alarm for HA automations (phone notifications)
   - platform: template
     id: fp_alarm
     name: Allarme impronte
-    device_class: safety        # in HA: "Non sicuro" quando e' in allarme
+    device_class: safety        # in HA: "Unsafe" while in alarm
     lambda: "return id(locked_out);"
 
-  # --- Sensore PIR AM312 (HW-740) ----------------------------------
-  # Il display e l'anello si accendono appena qualcuno si avvicina.
-  # GPIO34 non ha resistenze interne: mettere 100 kOhm tra GPIO34 e GND,
-  # cosi' l'ingresso resta a 0 anche se il PIR e' scollegato. NON usare
-  # 10 kOhm: l'uscita dell'AM312 e' debole e scende a ~1,5 V (mai rilevato).
+  # --- AM312 PIR sensor (HW-740) ----------------------------------
+  # Display and ring turn on as soon as someone approaches.
+  # GPIO34 has no internal resistors: fit 100 kOhm between GPIO34 and GND
+  # so the input stays at 0 if the PIR is disconnected. Do NOT use
+  # 10 kOhm: the AM312 output is weak and drops to ~1.5 V (never detected).
   - platform: gpio
     id: pir
     name: Movimento ingresso
     device_class: motion
-    pin: GPIO34                  # solo ingresso, ideale per il PIR
+    pin: GPIO34                  # input only, ideal for the PIR
     filters:
-      - delayed_on: 100ms        # ignora disturbi brevissimi sul cavo
-      - delayed_off: 5s          # evita accensioni/spegnimenti a raffica
+      - delayed_on: 100ms        # ignore very short glitches on the cable
+      - delayed_off: 5s          # avoid rapid on/off toggling
     on_press:
-      - script.execute: screen_wake        # display e anello del sensore insieme
+      - script.execute: screen_wake        # display and sensor ring together
 
-  # --- Pulsante del campanello -------------------------------------
+  # --- Doorbell push button ---------------------------------------
   - platform: gpio
     id: doorbell_button
     name: Pulsante campanello
@@ -1023,7 +1029,7 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     filters:
-      - delayed_on: 30ms           # antirimbalzo, utile con il cavo lungo
+      - delayed_on: 30ms           # debounce, useful with the long cable
       - delayed_off: 30ms
     on_press:
       - script.execute: doorbell_ring
@@ -1046,15 +1052,15 @@ binary_sensor:
           green: 30%
           blue: 100%
           effect: Scansione
-    # A registrazione finita, fallita o annullata torna al colore di stato
+    # When enrollment ends, fails or is cancelled, go back to the state colour
     on_release:
       - delay: 2s
       - script.execute: restore_strip
       - script.execute: aura_idle
 
 switch:
-  # Disattiva il lettore da HA: le impronte vengono ignorate, l'anello
-  # lampeggia rosso e il display lo segnala. Lo stato sopravvive ai riavvii.
+  # Disable the reader from HA: fingerprints are ignored, the ring blinks
+  # red and the display says so. The state survives reboots.
   - platform: template
     id: sw_reader_off
     name: Disattiva lettore impronte
@@ -1076,7 +1082,7 @@ switch:
           condition:
             lambda: "return id(tamper_latched);"
           then:
-            # durante una manomissione si riattiva solo con "Ripristina dopo manomissione"
+            # during a tamper event it can only be re-enabled with "Ripristina dopo manomissione"
             - switch.turn_on: sw_reader_off
             - text_sensor.template.publish:
                 id: last_event
@@ -1093,14 +1099,14 @@ switch:
                       state: "Lettore riattivato da Home Assistant"
 
 button:
-  # Suona il campanello sul buzzer interno (prova / chiamata da HA)
+  # Ring the doorbell on the indoor buzzer (test / call from HA)
   - platform: template
     name: Suona campanello interno
     icon: mdi:bell-ring
     on_press:
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }
 
-  # Ripristino dopo una manomissione: funziona solo con la placca rimontata
+  # Reset after a tamper event: only works with the plate mounted again
   - platform: template
     id: btn_tamper_reset
     name: Ripristina dopo manomissione
@@ -1122,8 +1128,8 @@ button:
                 id: last_event
                 state: "Manomissione ripristinata, lettore riattivato"
 
-  # Pulsante nella pagina del dispositivo in HA: annulla l'allarme
-  # e sblocca il lettore senza attendere i ${lockout_minutes} minuti
+  # Button on the device page in HA: cancel the alarm and unlock
+  # the reader without waiting ${lockout_minutes} minutes
   - platform: template
     id: btn_reset_alarm
     name: Sblocca lettore impronte
@@ -1134,10 +1140,10 @@ button:
             lambda: "return id(locked_out);"
           then:
             - script.execute: alarm_clear
-            - logger.log: "Allarme annullato da Home Assistant"
+            - logger.log: "Alarm cancelled from Home Assistant"
 
 event:
-  # Evento "Campanello" per le automazioni di HA (notifiche, suonerie...)
+  # "Campanello" (doorbell) event for HA automations (notifications, chimes...)
   - platform: template
     id: doorbell_event
     name: Campanello
@@ -1146,9 +1152,9 @@ event:
       - "premuto"
 
 number:
-  # Soglia minima di confidenza oltre a quella interna del sensore.
-  # Abbassala se le impronte giuste vengono rifiutate con "Lettura incerta";
-  # guarda il sensore "Ultima confidenza" per scegliere il valore.
+  # Minimum confidence on top of the sensor's own threshold.
+  # Lower it if valid fingerprints are rejected with "Lettura incerta"
+  # (uncertain reading); check the "Ultima confidenza" sensor to pick it.
   - platform: template
     id: min_confidence
     name: Soglia confidenza impronte
@@ -1163,12 +1169,12 @@ number:
     entity_category: config
 
 text_sensor:
-  # Stato dell'antimanomissione in chiaro, comodo per dashboard e badge
+  # Human-readable tamper status, handy for dashboards and badges
   - platform: template
     id: tamper_status
     name: Stato antimanomissione
     icon: mdi:shield-lock
-    # aggiornato dal blocco interval solo quando lo stato cambia
+    # updated by the interval block only when the state changes
   - platform: template
     id: last_event
     name: Ultimo evento

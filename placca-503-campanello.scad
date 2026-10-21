@@ -1,114 +1,115 @@
 // ============================================================
-//  Placca su misura per scatola 503
-//  Display OLED 0.96" SPI | Lettore R503 | PIR AM312 | Pulsante campanello | Buzzer
-//  Contatto reed antimanomissione (magnete incollato dentro la scatola)
-//  Tenuta perimetrale: cordone in gomma nitrilica da 2 mm incastrato in
-//  un solco sul retro (seal = "cordone"), oppure guarnizione in TPU
-//  stampata a parte o in multimateriale (seal = "tpu").
+//  Custom plate for an Italian 503 wall box (3-module flush box)
+//  0.96" SPI OLED display | R503 fingerprint reader | AM312 PIR |
+//  doorbell push button | buzzer
+//  Reed tamper switch (magnet glued inside the box)
+//  Perimeter seal: 2 mm rubber cord (nitrile or closed-cell silicone
+//  foam) pressed into a groove on the back (seal = "cord"), or a TPU
+//  gasket printed separately or as multi-material (seal = "tpu").
 //
-//  CORDONE: taglialo lungo quanto il solco, partendo da un lato
-//  dell'apertura di drenaggio in basso e finendo dall'altro. Spingilo
-//  nel solco senza tirarlo (se lo stiri poi si ritira), sigilla le due
-//  estremita' con una goccia di colla ciano. Sporge ~0,5 mm e si schiaccia
-//  stringendo le viti.
+//  CORD: cut it as long as the groove, starting on one side of the drain
+//  gap at the bottom and ending on the other. Push it into the groove
+//  without pulling (if you stretch it, it shrinks back later) and seal
+//  both ends with a drop of cyanoacrylate. It protrudes ~0.5 mm and gets
+//  squeezed when the screws are tightened.
 //
-//  Si avvita direttamente alla scatola 503 (interasse viti 83,5 mm)
-//  al posto di supporto + placca standard.
-//  Tutte le misure sono in mm e si cambiano qui sotto.
-//  Prima di stampare la versione finale: stampa una prova a
-//  bassa densita' e verifica i fori con i componenti veri.
+//  It screws straight onto the 503 box (83.5 mm screw spacing) instead
+//  of the standard frame + cover plate.
+//  All dimensions are in mm and can be changed below.
+//  Before printing the final version, print a low-density test and
+//  check the holes against the real parts.
 // ============================================================
 
-/* [Placca] */
-plate_w      = 120;   // larghezza
-plate_h      = 80;    // altezza
-plate_t      = 3.5;   // spessore (il dado dell'R503 serra fino a ~10 mm)
-corner_r     = 5;     // raggio degli angoli
-edge_chamfer = 0.8;   // smusso del bordo frontale
+/* [Plate] */
+plate_w      = 120;   // width
+plate_h      = 80;    // height
+plate_t      = 3.5;   // thickness (the R503 nut clamps up to ~10 mm)
+corner_r     = 5;     // corner radius
+edge_chamfer = 0.8;   // front edge chamfer
 
-/* [Viti scatola 503] */
-screw_pitch  = 83.5;  // interasse viti standard 503
-screw_d      = 3.6;   // foro passante
-screw_head_d = 7;     // testa svasata
+/* [503 box screws] */
+screw_pitch  = 83.5;  // standard 503 screw spacing
+screw_d      = 3.6;   // through hole
+screw_head_d = 7;     // countersunk head
 screw_head_h = 2;
 
-/* [Display OLED 0.96" (scheda 25,2 x 26)] */
-oled_x       = -19;   // posizione centro scheda
+/* [0.96" OLED display (25.2 x 26 board)] */
+oled_x       = -19;   // board centre position
 oled_y       = 13;
 oled_pcb_w   = 25.2;
 oled_pcb_h   = 26;
-oled_win_w   = 23;    // finestra visibile (area attiva ~21,7 x 10,9)
+oled_win_w   = 23;    // visible window (active area ~21.7 x 10.9)
 oled_win_h   = 12.5;
-oled_win_dy  = 1.5;   // centro finestra rispetto al centro scheda (+ = verso i pin)
-oled_glass_t = 1.7;   // spessore vetro sopra il PCB = altezza distanziali
-oled_hole_dx = 20.8;  // interasse fori scheda, orizzontale
-oled_hole_dy = 21.6;  //                       verticale
-oled_pin_d   = 1.7;   // perni che entrano nei fori della scheda (da fermare a caldo o con colla)
+oled_win_dy  = 1.5;   // window centre relative to board centre (+ = towards the pins)
+oled_glass_t = 1.7;   // glass thickness above the PCB = standoff height
+oled_hole_dx = 20.8;  // board hole spacing, horizontal
+oled_hole_dy = 21.6;  //                   vertical
+oled_pin_d   = 1.7;   // pins that go into the board holes (secure with heat or glue)
 oled_pin_h   = 3.5;
 oled_post_d  = 4;
 
-/* [Lettore R503 (filetto M25, flangia 28)] */
+/* [R503 reader (M25 thread, 28 mm flange)] */
 r503_x       = 12;
 r503_y       = 0;
-r503_hole_d  = 25.6;  // passaggio filetto M25
+r503_hole_d  = 25.6;  // M25 thread clearance
 
-/* [PIR AM312 (lente ~10 mm, larghezza 12)] */
+/* [AM312 PIR (~10 mm lens, 12 mm wide)] */
 pir_x        = 36;
 pir_y        = 14;
-pir_hole_d   = 10.2;  // la lente passa, il bordo da 12 mm fa battuta
-pir_boss_h   = 3;     // anello di centraggio dietro alla placca
+pir_hole_d   = 10.2;  // the lens goes through, the 12 mm rim seats against the plate
+pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 
-/* [Pulsante campanello antivandalo (testa 22, foro 19, filetto 14, profondita' 27)] */
+/* [Vandal-proof doorbell button (22 head, 19 hole, 14 thread, 27 depth)] */
 btn_x        = -22;
 btn_y        = -13.5;
-btn_hole_d   = 19.3;  // foro di installazione 19 mm + gioco
+btn_hole_d   = 19.3;  // 19 mm mounting hole + clearance
 
-/* [Buzzer (modulo 32,5 x 13, nascosto dietro la placca)] */
-buzz_x        = -40;   // centro del cilindretto del buzzer
+/* [Buzzer (32.5 x 13 module, hidden behind the plate)] */
+buzz_x        = -40;   // centre of the buzzer cylinder
 buzz_y        = 14;
-buzz_d        = 12;    // diametro cilindro buzzer
-buzz_h        = 9.5;   // altezza cilindro sopra il PCB
-buzz_ring_h   = 6;     // altezza dell'anello che lo trattiene
+buzz_d        = 12;    // buzzer cylinder diameter
+buzz_h        = 9.5;   // cylinder height above the PCB
+buzz_ring_h   = 6;     // height of the retaining ring
 buzz_ring_w   = 1.2;
-buzz_pcb_dir  = 1;     // il modulo si sviluppa verso +x (1) o -x (-1)
-buzz_hole_off = 9.5;   // distanza foro M3 del modulo dal centro del buzzer
-buzz_use_post = false; // la colonnina cadrebbe sulla scheda OLED: il modulo
-                       // si tiene con l'anello + una goccia di colla a caldo
-buzz_post_d   = 6;     // colonnina per la vite del modulo
-buzz_screw_d  = 2.5;   // foro per vite autofilettante M3 (o 2,9 mm)
-sound_hole_d  = 1.4;   // forellini per il suono
-sound_holes   = true;  // false = placca piena (suono molto piu' debole)
+buzz_pcb_dir  = 1;     // the module extends towards +x (1) or -x (-1)
+buzz_hole_off = 9.5;   // distance of the module's M3 hole from the buzzer centre
+buzz_use_post = false; // the post would land on the OLED board: the module
+                       // is held by the ring + a drop of hot glue
+buzz_post_d   = 6;     // post for the module screw
+buzz_screw_d  = 2.5;   // hole for an M3 self-tapping screw (or 2.9 mm)
+sound_hole_d  = 1.4;   // small sound holes
+sound_holes   = true;  // false = solid plate (much quieter sound)
 
-/* [Reed antimanomissione (corpo 14 x 3,2 mm, reofori 14 mm)] */
-// Il reed sta in una culla sul retro, parallelo al bordo inferiore della
-// scatola. Il magnete (6 x 2 mm) si incolla sulla parete interna della
-// scatola, di fronte a UNA ESTREMITA' del corpo del reed (vedi istruzioni).
-reed_x        = 29;    // centro del corpo del reed
-reed_y        = -22;   // piu' vicino al bordo scatola = magnete piu' efficace
-reed_len      = 14.4;  // corpo 14 mm + gioco
-reed_w        = 3.5;   // corpo 3,2 mm + gioco
-reed_wall     = 1.2;   // spessore pareti della culla
-reed_wall_h   = 3.4;   // altezza pareti (il reed sta tutto dentro)
+/* [Reed tamper switch (14 x 3.2 mm body, 14 mm leads)] */
+// The reed sits in a cradle on the back, parallel to the bottom edge of
+// the box. The magnet (6 x 2 mm) is glued to the inside wall of the box,
+// facing ONE END of the reed body.
+reed_x        = 29;    // centre of the reed body
+reed_y        = -22;   // closer to the box edge = stronger magnet effect
+reed_len      = 14.4;  // 14 mm body + clearance
+reed_w        = 3.5;   // 3.2 mm body + clearance
+reed_wall     = 1.2;   // cradle wall thickness
+reed_wall_h   = 3.4;   // wall height (the reed fits completely inside)
 
-/* [Tenuta] */
-part             = "tutto";  // "placca", "guarnizione" (solo TPU) o "tutto" (anteprima)
-seal             = "cordone";// "cordone" (nitrile nel solco), "tpu" o "nessuna"
+/* [Seal] */
+part             = "all";      // "plate", "gasket" (TPU only) or "all" (preview)
+seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"
 
-/* [Cordone in gomma nitrilica] */
-cord_d           = 2;        // diametro del cordone
-groove_w         = 2.0;      // larghezza solco: = diametro, il cordone resta in sede
-                             // (2,1 se fatica a entrare)
-groove_depth     = 1.45;     // profondita': sporge ~0,55 mm, schiacciamento ~27%
-groove_inset     = 3;        // distanza dal bordo della placca al solco
-                             // (per un cordone da 3 mm: groove_w 3, depth 2,2, plate_t 4)
+/* [Rubber cord] */
+cord_d           = 2;        // cord diameter
+groove_w         = 2.0;      // groove width: = diameter, the cord stays in place
+                             // (2.1 if it is hard to push in; closed-cell silicone foam: groove_depth 1.1)
+groove_depth     = 1.45;     // depth: protrudes ~0.55 mm, ~27% squeeze
+groove_inset     = 3;        // distance from the plate edge to the groove
+                             // (for a 3 mm cord: groove_w 3, depth 2.2, plate_t 4)
 
-/* [Guarnizione TPU (solo se seal = "tpu")] */
-gasket_inset     = 2.5;      // distanza dal bordo della placca
-gasket_w         = 3;        // larghezza del cordone
-gasket_h         = 1.6;      // altezza (si schiaccia a ~1 mm serrando le viti)
-gasket_groove    = 0.6;      // profondita' della sede nella placca
-gasket_drain     = 6;        // apertura in basso per far uscire la condensa (0 = chiusa)
+/* [TPU gasket (only if seal = "tpu")] */
+gasket_inset     = 2.5;      // distance from the plate edge
+gasket_w         = 3;        // bead width
+gasket_h         = 1.6;      // height (squeezed to ~1 mm when the screws are tight)
+gasket_groove    = 0.6;      // depth of the seat in the plate
+gasket_drain     = 6;        // gap at the bottom to let condensation out (0 = closed)
 
 $fn = 96;
 
@@ -120,7 +121,7 @@ module rounded_rect(w, h, r, t) {
 }
 
 module plate_body() {
-    // corpo con smusso sul bordo frontale (faccia frontale = z 0)
+    // body with a chamfer on the front edge (front face = z 0)
     hull() {
         translate([0, 0, edge_chamfer])
             rounded_rect(plate_w, plate_h, corner_r, plate_t - edge_chamfer);
@@ -131,7 +132,7 @@ module plate_body() {
 
 module screw_hole() {
     translate([0, 0, -0.01]) cylinder(d = screw_d, h = plate_t + 0.02);
-    // svasatura sul fronte
+    // countersink on the front
     translate([0, 0, -0.01])
         cylinder(d1 = screw_head_d, d2 = screw_d, h = screw_head_h);
 }
@@ -139,7 +140,7 @@ module screw_hole() {
 module oled_window() {
     translate([oled_x, oled_y + oled_win_dy, -0.01])
     hull() {
-        // finestra con bordo svasato verso il fronte (si legge meglio di lato)
+        // window with a bevelled edge towards the front (easier to read from the side)
         linear_extrude(0.01)
             offset(1) square([oled_win_w + 2, oled_win_h + 2] - [2, 2], center = true);
         translate([0, 0, plate_t])
@@ -165,13 +166,13 @@ module pir_boss() {
 }
 
 module buzzer_mount() {
-    // anello che trattiene il cilindro del buzzer, rivolto verso la placca
+    // ring holding the buzzer cylinder, facing the plate
     translate([buzz_x, buzz_y, plate_t])
         difference() {
             cylinder(d = buzz_d + 0.3 + 2*buzz_ring_w, h = buzz_ring_h);
             translate([0, 0, -0.01]) cylinder(d = buzz_d + 0.3, h = buzz_ring_h + 0.02);
         }
-    // colonnina per la vite: il PCB poggia sul buzzer e qui viene fissato
+    // post for the screw: the PCB rests on the buzzer and is fixed here
     if (buzz_use_post)
     translate([buzz_x + buzz_pcb_dir*buzz_hole_off, buzz_y, plate_t])
         difference() {
@@ -181,7 +182,7 @@ module buzzer_mount() {
 }
 
 module sound_grille() {
-    // 7 forellini a nido d'ape davanti al foro del buzzer
+    // 7 small honeycomb holes in front of the buzzer
     if (sound_holes)
         for (p = concat([[0, 0]], [for (a = [0:60:300]) [3*cos(a), 3*sin(a)]]))
             translate([buzz_x + p[0], buzz_y + p[1], -0.01])
@@ -189,7 +190,7 @@ module sound_grille() {
 }
 
 module reed_cradle() {
-    // culla a U aperta alle estremita' per i reofori; si chiude con colla a caldo
+    // U cradle open at the ends for the leads; close it with hot glue
     translate([reed_x, reed_y, plate_t])
         difference() {
             translate([-(reed_len)/2, -(reed_w/2 + reed_wall), 0])
@@ -199,8 +200,8 @@ module reed_cradle() {
         }
 }
 
-// anello perimetrale (in pianta) largo w a distanza inset dal bordo,
-// con apertura di drenaggio in basso
+// perimeter ring (plan view) w wide at distance inset from the edge,
+// with a drain gap at the bottom
 module ring_2d(inset, w) {
     ow = plate_w - 2*inset;
     oh = plate_h - 2*inset;
@@ -216,13 +217,13 @@ module ring_2d(inset, w) {
 module gasket_ring_2d() { ring_2d(gasket_inset, gasket_w); }
 module groove_ring_2d() { ring_2d(groove_inset, groove_w); }
 
-// cordone (solo per l'anteprima): sporge dal retro della placca
+// cord (preview only): protrudes from the back of the plate
 module cord_preview() {
     translate([0, 0, plate_t - groove_depth])
         linear_extrude(cord_d) offset(-(groove_w - cord_d)/2) groove_ring_2d();
 }
 
-// la guarnizione parte dal fondo della sede e sporge di gasket_h dal retro
+// the gasket starts at the bottom of its seat and protrudes gasket_h from the back
 module gasket() {
     translate([0, 0, plate_t - gasket_groove])
         linear_extrude(gasket_groove + gasket_h) gasket_ring_2d();
@@ -232,12 +233,12 @@ module plate() {
 difference() {
     plate_body();
 
-    // sede della guarnizione sul retro
+    // gasket seat on the back
     if (seal == "tpu")
         translate([0, 0, plate_t - gasket_groove])
             linear_extrude(gasket_groove + 0.01) gasket_ring_2d();
-    // solco per il cordone in gomma nitrilica
-    if (seal == "cordone")
+    // groove for the rubber cord
+    if (seal == "cord")
         translate([0, 0, plate_t - groove_depth])
             linear_extrude(groove_depth + 0.01) groove_ring_2d();
 
@@ -258,9 +259,9 @@ buzzer_mount();
 reed_cradle();
 }
 
-if (part == "placca" || part == "tutto") plate();
-if (seal == "tpu" && (part == "guarnizione" || part == "tutto")) color("DimGray") gasket();
-if (seal == "cordone" && part == "tutto") color("Black") cord_preview();
+if (part == "plate" || part == "all") plate();
+if (seal == "tpu" && (part == "gasket" || part == "all")) color("DimGray") gasket();
+if (seal == "cord" && part == "all") color("Black") cord_preview();
 
-// La faccia frontale e' quella appoggiata sul piano di stampa (z = 0):
-// stampala cosi', senza supporti. Il retro guarda verso l'alto.
+// The front face is the one on the print bed (z = 0):
+// print it like this, no supports. The back faces up.

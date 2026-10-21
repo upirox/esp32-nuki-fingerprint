@@ -1,0 +1,1051 @@
+# ============================================================
+#  ESP32 (38 pin) + lettore R503 + OLED SSD1306 -> Nuki via BLE
+#  Lo sblocco avviene in locale sull'ESP32: funziona anche se
+#  Home Assistant o il Wi-Fi sono giu'.
+#
+#  Collegamenti:
+#   R503  rosso VCC   -> 3V3      OLED 7 pin (SPI)
+#         bianco 3.3VT-> 3V3        GND      -> GND
+#         nero GND    -> GND        VCC      -> 3V3
+#         giallo TX   -> GPIO16     D0 (SCK) -> GPIO18
+#         viola RX    -> GPIO17     D1 (MOSI)-> GPIO23
+#         blu WAKEUP  -> GPIO4      RES      -> GPIO26
+#                                   DC       -> GPIO27
+#                                   CS       -> GPIO5
+#   Buzzer ESTERNO sulla placca, passivo 3 pin (low level trigger)
+#         VCC -> 3V3   GND -> GND   I/O -> GPIO25
+#   Buzzer INTERNO accanto all'ESP32 (stesso modello): campanello e sirene
+#         VCC -> VIN (5V, piu' forte)   GND -> GND   I/O -> GPIO21
+#   Striscia WS2812 (8 LED)
+#         +5V -> VIN   GND -> GND   DIN -> GPIO13 (resistenza 330 ohm)
+#   Sensore PIR AM312 (HW-740)
+#         VCC -> 3V3   GND -> GND   OUT -> GPIO34 (+ 100 kOhm verso GND, NON 10 kOhm)
+#   Pulsante campanello (normalmente aperto)
+#         un capo -> GPIO33   altro capo -> GND   (pull-up interno)
+#   Anello LED del pulsante (versione 3-6 V)
+#         LED+ -> GPIO32      LED- -> GND
+#   Microinterruttore antimanomissione (contatto NA, premuto a placca montata)
+#         un capo -> GPIO19   altro capo -> GND   (pull-up interno)
+#         placca montata = contatto chiuso; placca rimossa o filo tagliato = allarme
+#
+#  Striscia LED:
+#    verde tenue fisso  = porta chiusa
+#    rosso fisso        = porta sbloccata / aperta
+#    giallo pulsante    = serratura in movimento (apertura/chiusura)
+#    viola pulsante     = serratura inceppata
+#    blu tenue          = Nuki non raggiungibile / stato sconosciuto
+#    rosso lampeggiante = impronta non riconosciuta
+#    rosso pulsante     = ALLARME, lettore bloccato
+#    blu scansione      = registrazione impronta in corso
+# ============================================================
+
+packages:
+  base: !include common/base_config.yaml
+
+substitutions:
+  dev_friendly_name: "Ingresso"        # suffisso delle entita' diagnostiche del package
+  wifi_power_save: "LIGHT"             # OBBLIGATORIO: Wi-Fi + Bluetooth (Nuki) insieme
+  name: nuki-fingerprint
+  friendly_name: Nuki Fingerprint
+  # Allarme
+  max_attempts: "3"        # impronte errate consecutive prima dell'allarme
+  lockout_minutes: "15"    # durata del blocco del lettore
+  attempts_reset_minutes: "10"  # azzera gli errori se non ce ne sono altri entro questo tempo
+  # Suoni del buzzer (formato RTTTL: nome:d=durata,o=ottava,b=bpm:note)
+  tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # accesso consentito
+  tone_fail: "ko:d=8,o=5,b=180:d,p,d"                    # impronta rifiutata
+  tone_alarm: "alarm:d=8,o=6,b=200:c,g5,c,g5,c,g5,c,g5,c,g5" # allarme: sirena
+  tone_enroll_start: "enr:d=16,o=6,b=200:a,p,a"          # registrazione avviata
+  tone_enroll_scan: "scan:d=16,o=7,b=200:c"              # scansione ok, togli il dito
+  tone_enroll_done: "done:d=16,o=6,b=160:c,e,g,c7,e7,8g7" # impronta salvata
+  tone_enroll_fail: "efail:d=8,o=6,b=160:g,e,c,4c5"      # registrazione fallita
+  # Colore dell'anello del sensore quando il display e' acceso.
+  # L'R503 ha solo colori fissi: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
+  # WHITE tende al caldo; CYAN e' l'alternativa piu' fredda (bianco-azzurro).
+  aura_presence_color: BLUE
+  # Campanello (solo DENTRO): doppio ding-dong. Ottava 7 (2-2,6 kHz): e' la zona
+  # in cui i buzzer passivi risuonano e suonano piu' forte.
+  tone_bell: "bell:d=4,o=7,b=100:e,2c,4p,e,2c"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    - priority: -100
+      then:
+        # Reimposta l'anello del sensore: l'R503 resta alimentato durante
+        # l'OTA e ricorderebbe l'ultimo colore impostato (es. rosso di allarme)
+        - delay: 2s
+        - globals.set: { id: booted, value: "true" }
+        - logger.log:
+            level: WARN
+            format: "Stato ripristinato all'avvio: blocco impronte=%s, errori=%d, manomissione=%s"
+            args: [ 'id(locked_out) ? "SI" : "no"', 'id(failed_attempts)', 'id(tamper_latched) ? "SI" : "no"' ]
+        # Placca gia' aperta all'avvio (o filo scollegato): manomissione
+        - if:
+            condition:
+              binary_sensor.is_on: plate_open
+            then:
+              - script.execute: tamper_trigger
+        # Allarme impronte in corso prima del riavvio: il blocco riparte
+        # da capo (${lockout_minutes} min), cosi' staccare la corrente non lo accorcia
+        - if:
+            condition:
+              lambda: "return id(locked_out);"
+            then:
+              - logger.log:
+                  level: WARN
+                  format: "Riavvio durante l'allarme impronte: blocco ripristinato"
+              - script.execute: alarm_lockout
+            else:
+              # errori gia' contati: riparte il timer che li azzera
+              - if:
+                  condition:
+                    lambda: "return id(failed_attempts) > 0;"
+                  then:
+                    - script.execute: attempts_reset
+        - script.execute: aura_idle
+        - script.execute: restore_strip
+        - script.execute: screen_wake
+
+# I valori da ricordare (blocco, errori, manomissione) si scrivono in
+# flash SUBITO invece che ogni minuto: uno stacco di corrente appena
+# dopo l'allarme non li perde. Si scrive solo quando un valore cambia.
+preferences:
+  flash_write_interval: 0s
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf          # richiesto dal componente nuki_lock
+
+logger:
+
+# wifi, rete di emergenza, captive_portal, ota e diagnostica: dal package base
+api:
+  encryption:
+    key: !secret api_key
+  # Azioni richiamabili da Home Assistant per gestire le impronte
+  actions:
+    - action: enroll
+      variables:
+        finger_id: int
+        num_scans: int
+      then:
+        - fingerprint_grow.enroll:
+            finger_id: !lambda "return finger_id;"
+            num_scans: !lambda "return num_scans;"
+    - action: cancel_enroll
+      then:
+        - fingerprint_grow.cancel_enroll:
+        - script.execute: restore_strip
+    - action: delete
+      variables:
+        finger_id: int
+      then:
+        - fingerprint_grow.delete:
+            finger_id: !lambda "return finger_id;"
+    - action: delete_all
+      then:
+        - fingerprint_grow.delete_all:
+    # Annulla l'allarme e sblocca il lettore prima della scadenza
+    - action: reset_alarm
+      then:
+        - script.execute: alarm_clear
+    # Suona una melodia RTTTL sul buzzer interno, es. da un'automazione:
+    #   action: esphome.<nome_dispositivo>_suona_interno
+    #   data: { melodia: "bip:d=8,o=7,b=120:c,p,c" }
+    - action: suona_interno
+      variables:
+        melodia: string
+      then:
+        - rtttl.play:
+            id: buzzer_in
+            rtttl: !lambda "return melodia;"
+    # Ferma qualsiasi suono del buzzer interno
+    - action: ferma_interno
+      then:
+        - rtttl.stop:
+            id: buzzer_in
+
+# ---------------- Nuki (BLE) ----------------
+external_components:
+  - source: github://uriyacovy/ESPHome_nuki_lock
+
+lock:
+  - platform: nuki_lock
+    id: nuki
+    name: Nuki Lock
+    # PIN della serratura (quello impostato nell'app Nuki):
+    #  - Smart Lock 3.0: facoltativo, 4 cifre (serve solo per cambiare
+    #    le impostazioni della serratura da Home Assistant)
+    #  - 5th Gen / Ultra / Go / Pro: obbligatorio, 6 cifre
+    # Per usarlo, aggiungi  nuki_pin: "1234"  in secrets.yaml e togli il #
+    # security_pin: !secret nuki_pin
+    event: "none"
+    # --- Accoppiamento e stato collegamento ---
+    pairing_mode:                 # interruttore in HA per avviare l'accoppiamento
+      name: Accoppiamento Nuki
+    connected:
+      name: Nuki connesso
+    paired:
+      name: Nuki accoppiato
+    unpair:
+      name: Disaccoppia Nuki
+    # --- Diagnostica utile ---
+    battery_level:
+      name: Batteria Nuki
+    battery_critical:
+      name: Batteria Nuki scarica
+    bt_signal_strength:
+      name: Segnale Bluetooth Nuki
+    door_sensor_state:            # testo: chiusa / aperta / calibrazione...
+      name: Stato porta
+    door_sensor:                  # aperta/chiusa con icona che cambia (per badge e automazioni)
+      name: Porta ingresso
+      device_class: door
+    # Frequenza con cui il Nuki si annuncia via Bluetooth:
+    # piu' frequente = l'ESP32 lo raggiunge prima, ma consuma piu' batteria
+    advertising_mode:
+      name: Nuki Advertising Mode
+
+# ---------------- Striscia LED ----------------
+light:
+  - platform: esp32_rmt_led_strip
+    id: strip
+    name: Striscia LED
+    pin: GPIO13
+    num_leds: 8
+    chipset: WS2812
+    channel_colors: GRB
+    default_transition_length: 200ms
+    restore_mode: ALWAYS_OFF
+    effects:
+      - strobe:
+          name: Lampeggio rosso
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 120ms
+            - state: false
+              duration: 120ms
+      - pulse:
+          name: Pulsazione
+          transition_length: 600ms
+          update_interval: 600ms
+      - addressable_scan:
+          name: Scansione
+          move_interval: 80ms
+          scan_width: 2
+
+  # Anello luminoso del pulsante: tenue a riposo, pieno quando
+  # qualcuno si avvicina o tocca il lettore, lampeggiante quando suona
+  - platform: monochromatic
+    id: ring
+    name: Anello pulsante campanello
+    output: ring_out
+    default_transition_length: 300ms
+    restore_mode: ALWAYS_OFF          # all'avvio lo accende on_boot
+    effects:
+      - strobe:
+          name: Lampeggio
+          colors:
+            - state: true
+              brightness: 100%
+              duration: 150ms
+            - state: false
+              duration: 150ms
+
+# Aggiorna la striscia ogni volta che cambia lo stato del Nuki
+# (comandi da impronta, da HA, dall'app o a mano sulla serratura)
+interval:
+  # Stato antimanomissione: pubblica solo quando cambia (niente log/traffico inutili)
+  - interval: 500ms
+    then:
+      - lambda: |-
+          static std::string last;
+          std::string st;
+          if (id(tamper_latched) && id(plate_open).state) st = "Manomissione - placca aperta";
+          else if (id(tamper_latched))                    st = "Manomissione - da ripristinare";
+          else if (id(plate_open).state)                  st = "Placca aperta";
+          else                                            st = "Protetto";
+          if (st != last) {
+            last = st;
+            id(tamper_status).publish_state(st);
+          }
+
+  - interval: 300ms
+    then:
+      - lambda: |-
+          if (!id(booted)) return;
+          static int last = -1;
+          int s = (int) id(nuki).state;
+          if (s != last) {
+            last = s;
+            if (!id(fp_enrolling).state) id(restore_strip).execute();
+            id(screen_wake).execute();       // ogni cambio di stato riaccende il display
+          }
+
+# ---------------- Buzzer ----------------
+output:
+  # Ogni uscita PWM ha un canale su un TIMER DIVERSO (canali 0, 2, 4):
+  # i canali 0-1, 2-3, 4-5 condividono il timer e le melodie di un buzzer,
+  # cambiando frequenza, farebbero ronzare l'altro senza fermarsi.
+  - platform: ledc
+    id: buzzer_out
+    channel: 0
+    pin:
+      number: GPIO25
+      inverted: true     # modulo "low level trigger": a riposo il pin resta alto
+
+  # Buzzer interno, accanto all'ESP32
+  - platform: ledc
+    id: buzzer_in_out
+    channel: 2
+    pin:
+      number: GPIO21
+      inverted: true     # stesso modulo "low level trigger"
+
+  # Anello LED del pulsante campanello, pilotato direttamente dal GPIO
+  - platform: ledc
+    id: ring_out
+    channel: 4
+    pin: GPIO32
+    frequency: 1000Hz
+
+rtttl:
+  # Esterno (placca): conferme per chi e' alla porta e sirena dissuasiva
+  - id: buzzer
+    output: buzzer_out
+    gain: 50%            # volume: 50% = massimo (duty cycle); sotto = piu' piano
+  # Interno (accanto all'ESP32): campanello e allarmi per chi e' in casa
+  - id: buzzer_in
+    output: buzzer_in_out
+    # gain = duty cycle del PWM: 50% e' il volume MASSIMO per un buzzer
+    # passivo. A 100% l'uscita resta fissa (nessuna oscillazione) e si
+    # sentono solo crepitii ai cambi di nota.
+    gain: 50%
+
+# ---------------- Stato e messaggi ----------------
+globals:
+  # Blocco per manomissione: resta attivo anche dopo un riavvio,
+  # finche' non lo ripristini da Home Assistant
+  - id: tamper_latched
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: doorbell_ringing       # anello in lampeggio: screen_wake non lo tocca
+    type: bool
+    initial_value: "false"
+  # Diventa true a fine avvio: evita che l'interruttore, ripristinando il
+  # suo stato durante l'avvio, usi display e sensore non ancora pronti
+  - id: booted
+    type: bool
+    initial_value: "false"
+  # Contatore errori e blocco sopravvivono a un riavvio o a uno stacco
+  # di corrente: togliere l'alimentazione non sblocca il lettore
+  - id: failed_attempts
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: locked_out
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: screen_on              # display acceso: l'anello del sensore resta bianco
+    type: bool
+    initial_value: "false"
+  - id: msg1
+    type: std::string
+    initial_value: '"Appoggia il dito"'
+  - id: msg2
+    type: std::string
+    initial_value: '"sul lettore"'
+
+script:
+  # Manomissione: lettore bloccato, allarme, notifica tramite HA
+  - id: tamper_trigger
+    mode: single
+    then:
+      - globals.set: { id: tamper_latched, value: "true" }
+      - switch.turn_on: sw_reader_off
+      - script.execute: aura_idle
+      - script.execute: screen_wake
+      - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # avvisa anche in casa
+      - text_sensor.template.publish:
+          id: last_event
+          state: "MANOMISSIONE: placca rimossa, lettore bloccato"
+      - logger.log:
+          level: WARN
+          format: "Manomissione rilevata: lettore bloccato fino al ripristino da HA"
+
+  # Stato "di riposo" dell'anello del sensore:
+  #   allarme -> rosso fisso | lettore disattivato -> rosso lampeggiante
+  #   display acceso -> bianco fisso (stessa durata) | altrimenti spento
+  - id: aura_idle
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: "return id(locked_out);"
+          then:
+            - fingerprint_grow.aura_led_control:
+                state: ALWAYS_ON
+                speed: 0
+                color: RED
+                count: 0
+          else:
+            - if:
+                condition:
+                  switch.is_on: sw_reader_off
+                then:
+                  - fingerprint_grow.aura_led_control:
+                      state: FLASHING
+                      speed: 100
+                      color: RED
+                      count: 0          # 0 = all'infinito
+                else:
+                  - if:
+                      condition:
+                        # display acceso (e nessuna registrazione in corso):
+                        # anello bianco fisso, invita ad appoggiare il dito
+                        lambda: "return id(screen_on) && !id(fp_enrolling).state;"
+                      then:
+                        - fingerprint_grow.aura_led_control:
+                            state: ALWAYS_ON
+                            speed: 0
+                            color: ${aura_presence_color}
+                            count: 0
+                      else:
+                        - fingerprint_grow.aura_led_control:
+                            state: ALWAYS_OFF
+                            speed: 0
+                            color: BLUE
+                            count: 0
+
+  # Accende il display e lo spegne dopo 30 s di inattivita'.
+  # Ogni nuova chiamata riparte da zero (mode: restart).
+  # Durante l'allarme il display resta acceso.
+  - id: screen_wake
+    mode: restart
+    then:
+      - lambda: |-
+          id(oled).turn_on();
+          id(oled).update();
+      # display appena acceso (era spento): anello del sensore bianco.
+      # Se era gia' acceso non si tocca, per non interrompere i lampeggi
+      # di conferma o di errore in corso.
+      - if:
+          condition:
+            lambda: "return !id(screen_on);"
+          then:
+            - globals.set: { id: screen_on, value: "true" }
+            - script.execute: aura_idle
+      - if:
+          condition:
+            lambda: "return !id(doorbell_ringing);"
+          then:
+            - light.turn_on: { id: ring, brightness: 100%, effect: None }
+      - delay: 30s
+      - if:
+          condition:
+            lambda: "return !id(locked_out) && !id(tamper_latched);"
+          then:
+            - lambda: "id(oled).turn_off();"
+            - light.turn_on: { id: ring, brightness: 25%, effect: None }
+            - globals.set: { id: screen_on, value: "false" }
+            - if:
+                condition:
+                  lambda: "return !id(fp_enrolling).state;"
+                then:
+                  - script.execute: aura_idle    # anello del sensore spento
+
+  # Colore della striscia in base allo stato di allarme e del Nuki
+  - id: restore_strip
+    mode: restart
+    then:
+      - lambda: |-
+          auto call = id(strip).turn_on();
+          float r = 0, g = 0, b = 0, br = 0.6f;
+          std::string fx = "None";
+          if (id(locked_out)) {
+            r = 1; br = 1.0f; fx = "Pulsazione";               // allarme
+          } else {
+            switch (id(nuki).state) {
+              case lock::LOCK_STATE_LOCKED:
+                g = 1; br = 0.25f; break;                      // chiusa: verde tenue (tutto a posto)
+              case lock::LOCK_STATE_UNLOCKED:
+              case lock::LOCK_STATE_OPEN:
+              case lock::LOCK_STATE_OPENING:
+                r = 1; break;                                  // sbloccata: rosso (attenzione)
+              case lock::LOCK_STATE_LOCKING:
+              case lock::LOCK_STATE_UNLOCKING:
+                r = 1; g = 0.7f; fx = "Pulsazione"; break;     // in movimento
+              case lock::LOCK_STATE_JAMMED:
+                r = 0.7f; b = 1; fx = "Pulsazione"; break;     // inceppata
+              default:
+                b = 1; br = 0.15f; break;                      // sconosciuto
+            }
+          }
+          call.set_rgb(r, g, b);
+          call.set_brightness(br);
+          call.set_effect(fx);
+          call.perform();
+
+  # Lampeggio rosso per 1,5 s, poi ritorno al colore di stato
+  - id: flash_error
+    mode: restart
+    then:
+      - light.turn_on:
+          id: strip
+          effect: Lampeggio rosso
+      - delay: 1500ms
+      - script.execute: restore_strip
+
+  # Azzera il contatore degli errori se per ${attempts_reset_minutes} minuti
+  # non ci sono altri tentativi falliti (ogni errore fa ripartire il timer)
+  - id: attempts_reset
+    mode: restart
+    then:
+      - delay: ${attempts_reset_minutes}min
+      - if:
+          condition:
+            lambda: "return !id(locked_out) && id(failed_attempts) > 0;"
+          then:
+            - globals.set: { id: failed_attempts, value: "0" }
+            - logger.log: "Contatore impronte errate azzerato"
+
+  # Allarme: lettore bloccato per ${lockout_minutes} minuti
+  - id: alarm_lockout
+    mode: single
+    then:
+      - globals.set: { id: locked_out, value: "true" }
+      - logger.log:
+          level: WARN
+          format: "Allarme impronte: blocco attivato e salvato in memoria"
+      - script.stop: show_msg
+      - script.stop: flash_error
+      - script.execute: restore_strip
+      - script.execute: screen_wake
+      - fingerprint_grow.aura_led_control:   # anello del sensore rosso fisso
+          state: ALWAYS_ON
+          speed: 0
+          color: RED
+          count: 0
+      - component.update: oled
+      - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # avvisa anche in casa
+      - text_sensor.template.publish:
+          id: last_event
+          state: "ALLARME: ${max_attempts} impronte errate, lettore bloccato"
+      - delay: ${lockout_minutes}min
+      - script.execute: alarm_clear
+
+  # Fine allarme (alla scadenza o da Home Assistant con reset_alarm)
+  - id: alarm_clear
+    mode: single
+    then:
+      - script.stop: alarm_lockout
+      - globals.set: { id: locked_out, value: "false" }
+      - globals.set: { id: failed_attempts, value: "0" }
+      - script.execute: aura_idle
+      - script.execute: restore_strip
+      - script.execute: screen_wake          # riparte il timeout di 30 s
+      - text_sensor.template.publish:
+          id: last_event
+          state: "Allarme rientrato"
+
+  # Campanello: suono di conferma, messaggio e evento per HA.
+  # mode: single + attesa finale = una sola suonata ogni 5 s
+  # anche se il pulsante viene premuto a ripetizione.
+  - id: doorbell_ring
+    mode: single
+    then:
+      - globals.set: { id: doorbell_ringing, value: "true" }
+      - script.execute: screen_wake
+      - light.turn_on: { id: ring, effect: Lampeggio }
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }    # solo dentro: doppio ding-dong
+      - event.trigger:
+          id: doorbell_event
+          event_type: "premuto"
+      - script.execute:
+          id: show_msg
+          l1: "Din don!"
+          l2: "Avviso in corso..."
+      - text_sensor.template.publish:
+          id: last_event
+          state: "Campanello suonato"
+      - delay: 3s
+      - globals.set: { id: doorbell_ringing, value: "false" }
+      - light.turn_on: { id: ring, brightness: 100%, effect: None }
+      - delay: 2s
+
+  # Mostra un messaggio per 4 secondi, poi torna a quello di attesa
+  - id: show_msg
+    mode: restart
+    parameters:
+      l1: string
+      l2: string
+    then:
+      - lambda: |-
+          id(msg1) = l1;
+          id(msg2) = l2;
+          id(oled).update();
+      - delay: 4s
+      - lambda: |-
+          id(msg1) = "Appoggia il dito";
+          id(msg2) = "sul lettore";
+          id(oled).update();
+      # finiti i lampeggi di conferma/errore, l'anello torna allo stato di
+      # riposo (bianco se c'e' ancora qualcuno davanti)
+      - if:
+          condition:
+            lambda: "return !id(fp_enrolling).state;"
+          then:
+            - script.execute: aura_idle
+
+# ---------------- Display OLED ----------------
+spi:
+  clk_pin: GPIO18       # D0
+  mosi_pin: GPIO23      # D1
+
+font:
+  - file: "gfonts://Roboto@500"
+    id: font_big
+    size: 15
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 11
+
+display:
+  - platform: ssd1306_spi
+    id: oled
+    model: "SSD1306 128x64"   # se l'immagine e' spostata di 2 px: "SH1106 128x64"
+    # CS collegato a GPIO5 (un filo in piu' nel cavo verso la placca).
+    # Con CS fisso a GND il display non si accendeva: il CS serve a
+    # risincronizzare il display a ogni comando.
+    # GPIO5 e' un pin di strapping: il warning in compilazione e' normale.
+    cs_pin:
+      number: GPIO5
+      ignore_strapping_warning: true
+    dc_pin: GPIO27
+    reset_pin: GPIO26
+    data_rate: 1MHz           # SPI rallentato per i 2 m di cavo
+    update_interval: 2s
+    lambda: |-
+      if (id(tamper_latched)) {
+        it.filled_rectangle(0, 0, 128, 19);
+        it.print(64, 10, id(font_big), COLOR_OFF, TextAlign::CENTER, "! ALLARME !");
+        it.print(64, 29, id(font_small), TextAlign::CENTER, "Sistema bloccato");
+        it.print(64, 42, id(font_small), TextAlign::CENTER, "Accesso disabilitato");
+      } else if (id(locked_out)) {
+        // Banda invertita in alto con la scritta ALLARME
+        it.filled_rectangle(0, 0, 128, 19);
+        it.print(64, 10, id(font_big), COLOR_OFF, TextAlign::CENTER, "! ALLARME !");
+        it.print(64, 29, id(font_small), TextAlign::CENTER, "Sistema bloccato");
+        it.print(64, 42, id(font_small), TextAlign::CENTER, "Accesso disabilitato");
+      } else if (id(sw_reader_off).state) {
+        it.print(64, 18, id(font_big), TextAlign::CENTER, "Disattivato");
+        it.print(64, 38, id(font_small), TextAlign::CENTER, "Usa chiave o app");
+      } else if (id(msg1) != "Appoggia il dito") {
+        // messaggio temporaneo (Benvenuto, Non riconosciuto, Din don...)
+        it.print(64, 18, id(font_big), TextAlign::CENTER, id(msg1).c_str());
+        it.print(64, 38, id(font_small), TextAlign::CENTER, id(msg2).c_str());
+      } else {
+        // messaggio di attesa coerente con lo stato della serratura:
+        // "Appoggia il dito" solo quando l'impronta serve davvero
+        const char *a = "Appoggia il dito", *b = "sul lettore";
+        switch (id(nuki).state) {
+          case lock::LOCK_STATE_UNLOCKING:
+          case lock::LOCK_STATE_OPENING:
+            a = "Apertura..."; b = "attendi un istante"; break;
+          case lock::LOCK_STATE_UNLOCKED:
+          case lock::LOCK_STATE_OPEN:
+            a = "Porta aperta"; b = "puoi entrare"; break;
+          case lock::LOCK_STATE_LOCKING:
+            a = "Chiusura..."; b = "attendi un istante"; break;
+          case lock::LOCK_STATE_JAMMED:
+            a = "Inceppata"; b = "usa la chiave"; break;
+          default: break;   // chiusa o stato sconosciuto: serve l'impronta
+        }
+        it.print(64, 18, id(font_big), TextAlign::CENTER, a);
+        it.print(64, 38, id(font_small), TextAlign::CENTER, b);
+      }
+      // Riga di stato in basso: stato serratura
+      const char *st = "Nuki: ?";
+      switch (id(nuki).state) {
+        case lock::LOCK_STATE_LOCKED:    st = "Porta chiusa"; break;
+        case lock::LOCK_STATE_UNLOCKED:  st = "Porta sbloccata"; break;
+        case lock::LOCK_STATE_LOCKING:   st = "Chiusura..."; break;
+        case lock::LOCK_STATE_UNLOCKING: st = "Apertura..."; break;
+        case lock::LOCK_STATE_JAMMED:    st = "Serratura bloccata"; break;
+        default: break;
+      }
+      it.line(0, 52, 127, 52);
+      it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, st);
+
+# ---------------- Lettore impronte ----------------
+uart:
+  rx_pin: GPIO16   # <- giallo (TX del sensore)
+  tx_pin: GPIO17   # -> viola  (RX del sensore)
+  baud_rate: 57600
+
+fingerprint_grow:
+  id: fp
+  sensing_pin: GPIO4          # blu (WAKEUP): basso quando c'e' un dito
+  # --- PASSWORD DEL SENSORE (protezione contro la sostituzione) ---
+  # La password e' gia' stata scritta nel sensore: qui resta attiva
+  # SOLO "password". Il valore (decimale, senza virgolette) sta in
+  # secrets.yaml come  fp_password: 1234567890
+  # "new_password" serve solo per cambiarla: NON riattivarla.
+  password: !secret fp_password
+  # Il dito sul sensore (WAKEUP) riaccende il display
+  on_finger_scan_start:
+    - script.execute: screen_wake
+  on_finger_scan_matched:
+    - if:
+        condition:
+          lambda: "return !id(locked_out) && !id(sw_reader_off).state && confidence >= (int) id(min_confidence).state;"
+        then:
+          - globals.set:
+              id: failed_attempts
+              value: "0"
+          - fingerprint_grow.aura_led_control:   # impronta accettata: respiro verde
+              state: BREATHING
+              speed: 200
+              color: GREEN
+              count: 1
+          - script.execute:
+              id: show_msg
+              l1: "Benvenuto"
+              l2: "Apertura in corso"
+          - rtttl.play: { id: buzzer, rtttl: "${tone_ok}" }
+          # Scegli UNO dei due:
+          - lock.unlock: nuki       # ruota il cilindro (sblocca)
+          # - lock.open: nuki       # sblocca + trattiene lo scrocco (apre la porta)
+          - text_sensor.template.publish:
+              id: last_event
+              state: !lambda 'return "Sbloccato da impronta #" + to_string(finger_id);'
+        else:
+          # impronta valida ma lettore in allarme/disattivato, o confidenza bassa
+          - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
+          - script.execute: screen_wake
+          - if:
+              condition:
+                lambda: "return !id(locked_out) && !id(sw_reader_off).state;"
+              then:
+                # confidenza sotto soglia: non conta come errore, chiede di riprovare
+                - script.execute:
+                    id: show_msg
+                    l1: "Lettura incerta"
+                    l2: "Riappoggia il dito"
+                - text_sensor.template.publish:
+                    id: last_event
+                    state: !lambda 'return "Impronta #" + to_string(finger_id) + " con confidenza bassa (" + to_string(confidence) + ")";'
+  # Dito appoggiato male o tolto troppo presto: non conta come errore
+  on_finger_scan_misplaced:
+    - script.execute:
+        id: show_msg
+        l1: "Dito spostato"
+        l2: "Tienilo fermo"
+  # Immagine illeggibile (dito asciutto, bagnato, sporco): non conta come errore
+  on_finger_scan_invalid:
+    - script.execute:
+        id: show_msg
+        l1: "Non leggibile"
+        l2: "Appoggia tutto il dito"
+  on_finger_scan_unmatched:
+    - if:
+        condition:
+          lambda: "return id(locked_out) || id(sw_reader_off).state;"
+        then:
+          # allarme o lettore disattivato: nessun conteggio, solo rifiuto
+          - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
+          - script.execute: screen_wake
+        else:
+          - lambda: "id(failed_attempts) += 1;"
+          - script.execute: attempts_reset
+          - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
+          - fingerprint_grow.aura_led_control:
+              state: FLASHING
+              speed: 25
+              color: RED
+              count: 2
+          - script.execute:
+              id: show_msg
+              l1: "Non riconosciuto"
+              l2: !lambda 'return "Tentativo " + to_string(id(failed_attempts)) + " di ${max_attempts}";'
+          - script.execute: flash_error
+          - text_sensor.template.publish:
+              id: last_event
+              state: !lambda 'return "Impronta non riconosciuta (" + to_string(id(failed_attempts)) + "/${max_attempts})";'
+          - if:
+              condition:
+                lambda: "return id(failed_attempts) >= ${max_attempts};"
+              then:
+                - delay: 1600ms           # lascia finire suono e lampeggio di rifiuto
+                - script.execute: alarm_lockout
+  on_enrollment_scan:
+    - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_scan}" }
+    - script.execute: screen_wake
+    - light.turn_on:
+        id: strip
+        brightness: 60%
+        red: 0%
+        green: 30%
+        blue: 100%
+        effect: Scansione
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: BLUE
+        count: 2
+    - script.execute:
+        id: show_msg
+        l1: "Registrazione"
+        l2: "Togli e riappoggia"
+  on_enrollment_done:
+    - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_done}" }
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 100
+        color: BLUE
+        count: 2
+    - script.execute:
+        id: show_msg
+        l1: "Impronta salvata"
+        l2: !lambda 'return "ID " + to_string(finger_id);'
+  on_enrollment_failed:
+    - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_fail}" }
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: RED
+        count: 4
+    - script.execute:
+        id: show_msg
+        l1: "Registrazione"
+        l2: "fallita, riprova"
+    - script.execute: flash_error
+
+sensor:
+  - platform: fingerprint_grow
+    fingerprint_count:
+      name: Impronte registrate
+    last_finger_id:
+      name: Ultima impronta ID
+    last_confidence:
+      name: Ultima confidenza
+
+binary_sensor:
+  # Stato istantaneo del microinterruttore (on = placca rimossa o filo tagliato)
+  - platform: gpio
+    id: plate_open
+    name: Placca rimossa
+    device_class: tamper
+    pin:
+      number: GPIO19
+      mode: INPUT_PULLUP
+    filters:
+      - delayed_on: 300ms          # ignora vibrazioni e colpi alla porta
+      - delayed_off: 300ms
+    on_press:
+      - if:
+          condition:
+            lambda: "return id(booted);"
+          then:
+            - script.execute: tamper_trigger
+
+  # Manomissione memorizzata: resta "on" fino al ripristino da HA.
+  # Da usare nelle automazioni per le notifiche.
+  - platform: template
+    id: tamper_alarm
+    name: Manomissione placca
+    device_class: tamper
+    lambda: "return id(tamper_latched);"
+
+  # Allarme da usare nelle automazioni di HA (notifiche ai cellulari)
+  - platform: template
+    id: fp_alarm
+    name: Allarme impronte
+    device_class: safety        # in HA: "Non sicuro" quando e' in allarme
+    lambda: "return id(locked_out);"
+
+  # --- Sensore PIR AM312 (HW-740) ----------------------------------
+  # Il display e l'anello si accendono appena qualcuno si avvicina.
+  # GPIO34 non ha resistenze interne: mettere 100 kOhm tra GPIO34 e GND,
+  # cosi' l'ingresso resta a 0 anche se il PIR e' scollegato. NON usare
+  # 10 kOhm: l'uscita dell'AM312 e' debole e scende a ~1,5 V (mai rilevato).
+  - platform: gpio
+    id: pir
+    name: Movimento ingresso
+    device_class: motion
+    pin: GPIO34                  # solo ingresso, ideale per il PIR
+    filters:
+      - delayed_on: 100ms        # ignora disturbi brevissimi sul cavo
+      - delayed_off: 5s          # evita accensioni/spegnimenti a raffica
+    on_press:
+      - script.execute: screen_wake        # display e anello del sensore insieme
+
+  # --- Pulsante del campanello -------------------------------------
+  - platform: gpio
+    id: doorbell_button
+    name: Pulsante campanello
+    pin:
+      number: GPIO33
+      mode: INPUT_PULLUP
+      inverted: true
+    filters:
+      - delayed_on: 30ms           # antirimbalzo, utile con il cavo lungo
+      - delayed_off: 30ms
+    on_press:
+      - script.execute: doorbell_ring
+
+  - platform: fingerprint_grow
+    id: fp_enrolling
+    name: Registrazione in corso
+    on_press:
+      - script.execute: screen_wake
+      - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_start}" }
+      - script.stop: restore_strip
+      - script.execute:
+          id: show_msg
+          l1: "Registrazione"
+          l2: "Appoggia il dito"
+      - light.turn_on:
+          id: strip
+          brightness: 60%
+          red: 0%
+          green: 30%
+          blue: 100%
+          effect: Scansione
+    # A registrazione finita, fallita o annullata torna al colore di stato
+    on_release:
+      - delay: 2s
+      - script.execute: restore_strip
+      - script.execute: aura_idle
+
+switch:
+  # Disattiva il lettore da HA: le impronte vengono ignorate, l'anello
+  # lampeggia rosso e il display lo segnala. Lo stato sopravvive ai riavvii.
+  - platform: template
+    id: sw_reader_off
+    name: Disattiva lettore impronte
+    icon: mdi:fingerprint-off
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - if:
+          condition:
+            lambda: "return id(booted);"
+          then:
+            - script.execute: aura_idle
+            - script.execute: screen_wake
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Lettore disattivato da Home Assistant"
+    on_turn_off:
+      - if:
+          condition:
+            lambda: "return id(tamper_latched);"
+          then:
+            # durante una manomissione si riattiva solo con "Ripristina dopo manomissione"
+            - switch.turn_on: sw_reader_off
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Manomissione attiva: usa Ripristina dopo manomissione"
+          else:
+            - if:
+                condition:
+                  lambda: "return id(booted);"
+                then:
+                  - script.execute: aura_idle
+                  - script.execute: screen_wake
+                  - text_sensor.template.publish:
+                      id: last_event
+                      state: "Lettore riattivato da Home Assistant"
+
+button:
+  # Suona il campanello sul buzzer interno (prova / chiamata da HA)
+  - platform: template
+    name: Suona campanello interno
+    icon: mdi:bell-ring
+    on_press:
+      - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }
+
+  # Ripristino dopo una manomissione: funziona solo con la placca rimontata
+  - platform: template
+    id: btn_tamper_reset
+    name: Ripristina dopo manomissione
+    icon: mdi:shield-refresh
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_on: plate_open
+          then:
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Ripristino rifiutato: la placca risulta ancora aperta"
+          else:
+            - globals.set: { id: tamper_latched, value: "false" }
+            - switch.turn_off: sw_reader_off
+            - script.execute: aura_idle
+            - script.execute: screen_wake
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Manomissione ripristinata, lettore riattivato"
+
+  # Pulsante nella pagina del dispositivo in HA: annulla l'allarme
+  # e sblocca il lettore senza attendere i ${lockout_minutes} minuti
+  - platform: template
+    id: btn_reset_alarm
+    name: Sblocca lettore impronte
+    icon: mdi:fingerprint
+    on_press:
+      - if:
+          condition:
+            lambda: "return id(locked_out);"
+          then:
+            - script.execute: alarm_clear
+            - logger.log: "Allarme annullato da Home Assistant"
+
+event:
+  # Evento "Campanello" per le automazioni di HA (notifiche, suonerie...)
+  - platform: template
+    id: doorbell_event
+    name: Campanello
+    device_class: doorbell
+    event_types:
+      - "premuto"
+
+number:
+  # Soglia minima di confidenza oltre a quella interna del sensore.
+  # Abbassala se le impronte giuste vengono rifiutate con "Lettura incerta";
+  # guarda il sensore "Ultima confidenza" per scegliere il valore.
+  - platform: template
+    id: min_confidence
+    name: Soglia confidenza impronte
+    icon: mdi:fingerprint
+    min_value: 0
+    max_value: 200
+    step: 5
+    initial_value: 25
+    optimistic: true
+    restore_value: true
+    mode: box
+    entity_category: config
+
+text_sensor:
+  # Stato dell'antimanomissione in chiaro, comodo per dashboard e badge
+  - platform: template
+    id: tamper_status
+    name: Stato antimanomissione
+    icon: mdi:shield-lock
+    # aggiornato dal blocco interval solo quando lo stato cambia
+  - platform: template
+    id: last_event
+    name: Ultimo evento

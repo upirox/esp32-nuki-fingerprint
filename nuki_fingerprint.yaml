@@ -46,9 +46,9 @@
 #    red, pulsing       = ALARM, reader locked out
 #    blue, scanning     = fingerprint enrollment in progress
 #
-#  Entity names, on-screen messages and Home Assistant event texts are in
-#  Italian: change them freely (note that renaming an entity changes its
-#  entity_id in Home Assistant).
+#  Home Assistant entities, actions and event texts are in English.
+#  The messages shown on the OLED display are in Italian: they are plain
+#  strings in the display lambda and in show_msg calls, change them freely.
 # ============================================================
 
 packages:
@@ -165,17 +165,17 @@ api:
       then:
         - script.execute: alarm_clear
     # Play an RTTTL tune on the indoor buzzer, e.g. from an automation:
-    #   action: esphome.<device_name>_suona_interno
-    #   data: { melodia: "beep:d=8,o=7,b=120:c,p,c" }
-    - action: suona_interno
+    #   action: esphome.<device_name>_play_indoor
+    #   data: { tune: "beep:d=8,o=7,b=120:c,p,c" }
+    - action: play_indoor
       variables:
-        melodia: string
+        tune: string
       then:
         - rtttl.play:
             id: buzzer_in
-            rtttl: !lambda "return melodia;"
+            rtttl: !lambda "return tune;"
     # Stop any sound on the indoor buzzer
-    - action: ferma_interno
+    - action: stop_indoor
       then:
         - rtttl.stop:
             id: buzzer_in
@@ -197,24 +197,24 @@ lock:
     event: "none"
     # --- Pairing and connection state ---
     pairing_mode:                 # switch in HA to start pairing
-      name: Accoppiamento Nuki
+      name: Nuki Pairing Mode
     connected:
-      name: Nuki connesso
+      name: Nuki Connected
     paired:
-      name: Nuki accoppiato
+      name: Nuki Paired
     unpair:
-      name: Disaccoppia Nuki
+      name: Nuki Unpair
     # --- Useful diagnostics ---
     battery_level:
-      name: Batteria Nuki
+      name: Nuki Battery
     battery_critical:
-      name: Batteria Nuki scarica
+      name: Nuki Battery Critical
     bt_signal_strength:
-      name: Segnale Bluetooth Nuki
+      name: Nuki Bluetooth Signal
     door_sensor_state:            # text: closed / open / calibrating...
-      name: Stato porta
+      name: Door Sensor State
     door_sensor:                  # open/closed with changing icon (for badges and automations)
-      name: Porta ingresso
+      name: Entrance Door
       device_class: door
     # How often the Nuki advertises over Bluetooth:
     # more often = the ESP32 reaches it faster, but it drains the battery more
@@ -225,7 +225,7 @@ lock:
 light:
   - platform: esp32_rmt_led_strip
     id: strip
-    name: Striscia LED
+    name: Status LED Strip
     pin: GPIO13
     num_leds: 8
     chipset: WS2812
@@ -234,7 +234,7 @@ light:
     restore_mode: ALWAYS_OFF
     effects:
       - strobe:
-          name: Lampeggio rosso
+          name: Red Blink
           colors:
             - state: true
               brightness: 100%
@@ -245,11 +245,11 @@ light:
             - state: false
               duration: 120ms
       - pulse:
-          name: Pulsazione
+          name: Pulse
           transition_length: 600ms
           update_interval: 600ms
       - addressable_scan:
-          name: Scansione
+          name: Scan
           move_interval: 80ms
           scan_width: 2
 
@@ -257,13 +257,13 @@ light:
   # or touches the reader, blinking while the doorbell rings
   - platform: monochromatic
     id: ring
-    name: Anello pulsante campanello
+    name: Doorbell Button Ring
     output: ring_out
     default_transition_length: 300ms
     restore_mode: ALWAYS_OFF          # turned on by on_boot
     effects:
       - strobe:
-          name: Lampeggio
+          name: Blink
           colors:
             - state: true
               brightness: 100%
@@ -280,10 +280,10 @@ interval:
       - lambda: |-
           static std::string last;
           std::string st;
-          if (id(tamper_latched) && id(plate_open).state) st = "Manomissione - placca aperta";
-          else if (id(tamper_latched))                    st = "Manomissione - da ripristinare";
-          else if (id(plate_open).state)                  st = "Placca aperta";
-          else                                            st = "Protetto";
+          if (id(tamper_latched) && id(plate_open).state) st = "Tamper - plate open";
+          else if (id(tamper_latched))                    st = "Tamper - reset needed";  
+          else if (id(plate_open).state)                  st = "Plate open";
+          else                                            st = "Protected";
           if (st != last) {
             last = st;
             id(tamper_status).publish_state(st);
@@ -390,7 +390,7 @@ script:
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
           id: last_event
-          state: "MANOMISSIONE: placca rimossa, lettore bloccato"
+          state: "TAMPER: plate removed, reader locked"
       - logger.log:
           level: WARN
           format: "Tamper detected: reader locked until reset from HA"
@@ -501,7 +501,7 @@ script:
           float r = 0, g = 0, b = 0, br = 0.6f;
           std::string fx = "None";
           if (id(locked_out)) {
-            r = 1; br = 1.0f; fx = "Pulsazione";               // alarm
+            r = 1; br = 1.0f; fx = "Pulse";               // alarm
           } else {
             switch (id(nuki).state) {
               case lock::LOCK_STATE_LOCKED:
@@ -512,9 +512,9 @@ script:
                 r = 1; break;                                  // unlocked: red (attention)
               case lock::LOCK_STATE_LOCKING:
               case lock::LOCK_STATE_UNLOCKING:
-                r = 1; g = 0.7f; fx = "Pulsazione"; break;     // moving
+                r = 1; g = 0.7f; fx = "Pulse"; break;     // moving
               case lock::LOCK_STATE_JAMMED:
-                r = 0.7f; b = 1; fx = "Pulsazione"; break;     // jammed
+                r = 0.7f; b = 1; fx = "Pulse"; break;     // jammed
               default:
                 b = 1; br = 0.15f; break;                      // unknown
             }
@@ -532,7 +532,7 @@ script:
     then:
       - light.turn_on:
           id: strip
-          effect: Lampeggio rosso
+          effect: Red Blink
       - delay: 1500ms
       - script.execute: restore_strip
 
@@ -571,7 +571,7 @@ script:
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
           id: last_event
-          state: "ALLARME: ${max_attempts} impronte errate, lettore bloccato"
+          state: "ALARM: ${max_attempts} wrong fingerprints, reader locked"
       - delay: ${lockout_minutes}min
       - script.execute: alarm_clear
 
@@ -587,7 +587,7 @@ script:
       - script.execute: screen_wake          # restart the 30 s timeout
       - text_sensor.template.publish:
           id: last_event
-          state: "Allarme rientrato"
+          state: "Alarm cleared"
 
   # Doorbell: chime, on-screen message and event for HA.
   # mode: single + final delay = at most one ring every 5 s,
@@ -597,18 +597,18 @@ script:
     then:
       - globals.set: { id: doorbell_ringing, value: "true" }
       - script.execute: screen_wake
-      - light.turn_on: { id: ring, effect: Lampeggio }
+      - light.turn_on: { id: ring, effect: Blink }
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }    # indoor only: double ding-dong
       - event.trigger:
           id: doorbell_event
-          event_type: "premuto"
+          event_type: "pressed"
       - script.execute:
           id: show_msg
           l1: "Din don!"
           l2: "Avviso in corso..."
       - text_sensor.template.publish:
           id: last_event
-          state: "Campanello suonato"
+          state: "Doorbell rang"
       - delay: 3s
       - globals.set: { id: doorbell_ringing, value: "false" }
       - light.turn_on:
@@ -767,7 +767,7 @@ fingerprint_grow:
           # - lock.open: nuki       # unlock + pull the latch (opens the door)
           - text_sensor.template.publish:
               id: last_event
-              state: !lambda 'return "Sbloccato da impronta #" + to_string(finger_id);'
+              state: !lambda 'return "Unlocked by fingerprint #" + to_string(finger_id);'
         else:
           # valid fingerprint but reader in alarm/disabled, or low confidence
           - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
@@ -783,7 +783,7 @@ fingerprint_grow:
                     l2: "Riappoggia il dito"
                 - text_sensor.template.publish:
                     id: last_event
-                    state: !lambda 'return "Impronta #" + to_string(finger_id) + " con confidenza bassa (" + to_string(confidence) + ")";'
+                    state: !lambda 'return "Fingerprint #" + to_string(finger_id) + " with low confidence (" + to_string(confidence) + ")";'
   # Finger misplaced or lifted too early: not counted as an error
   on_finger_scan_misplaced:
     - script.execute:
@@ -820,7 +820,7 @@ fingerprint_grow:
           - script.execute: flash_error
           - text_sensor.template.publish:
               id: last_event
-              state: !lambda 'return "Impronta non riconosciuta (" + to_string(id(failed_attempts)) + "/${max_attempts})";'
+              state: !lambda 'return "Fingerprint not recognised (" + to_string(id(failed_attempts)) + "/${max_attempts})";'
           - if:
               condition:
                 lambda: "return id(failed_attempts) >= ${max_attempts};"
@@ -836,7 +836,7 @@ fingerprint_grow:
         red: 0%
         green: 30%
         blue: 100%
-        effect: Scansione
+        effect: Scan
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
@@ -876,7 +876,7 @@ sensor:
   # voltage). Average of 6 readings: one value per minute.
   - platform: adc
     id: batt_voltage
-    name: Tensione batteria
+    name: Backup Battery Voltage
     pin: GPIO39
     attenuation: 12db
     update_interval: 10s
@@ -896,7 +896,7 @@ sensor:
   # On mains power the cell is charging: the percentage is only indicative.
   - platform: template
     id: batt_percent
-    name: Batteria
+    name: Backup Battery
     unit_of_measurement: "%"
     device_class: battery
     accuracy_decimals: 0
@@ -918,11 +918,11 @@ sensor:
 
   - platform: fingerprint_grow
     fingerprint_count:
-      name: Impronte registrate
+      name: Enrolled Fingerprints
     last_finger_id:
-      name: Ultima impronta ID
+      name: Last Fingerprint ID
     last_confidence:
-      name: Ultima confidenza
+      name: Last Fingerprint Confidence
 
 binary_sensor:
   # Mains power on the ESP32's line (5 V from the power supply, before
@@ -931,7 +931,7 @@ binary_sensor:
   # GPIO39 can induce on GPIO36 (known ESP32 erratum).
   - platform: gpio
     id: mains_ok
-    name: Alimentazione di rete
+    name: Mains Power
     device_class: power
     pin: GPIO36                      # input only, pull-down = external 20k resistor
     filters:
@@ -944,7 +944,7 @@ binary_sensor:
           then:
             - text_sensor.template.publish:
                 id: last_event
-                state: "Corrente assente: funzionamento a batteria"
+                state: "Mains power lost: running on battery"
             - logger.log:
                 level: WARN
                 format: "Mains power lost: power saving mode"
@@ -962,7 +962,7 @@ binary_sensor:
           then:
             - text_sensor.template.publish:
                 id: last_event
-                state: "Corrente di rete tornata"
+                state: "Mains power restored"
       # strip and ring always follow, even during boot
       - script.execute: restore_strip
       - if:
@@ -974,7 +974,7 @@ binary_sensor:
   # Live tamper switch state (on = plate removed or wire cut)
   - platform: gpio
     id: plate_open
-    name: Placca rimossa
+    name: Plate Removed
     device_class: tamper
     pin:
       number: GPIO19
@@ -993,14 +993,14 @@ binary_sensor:
   # Use it in automations for notifications.
   - platform: template
     id: tamper_alarm
-    name: Manomissione placca
+    name: Plate Tamper
     device_class: tamper
     lambda: "return id(tamper_latched);"
 
   # Alarm for HA automations (phone notifications)
   - platform: template
     id: fp_alarm
-    name: Allarme impronte
+    name: Fingerprint Alarm
     device_class: safety        # in HA: "Unsafe" while in alarm
     lambda: "return id(locked_out);"
 
@@ -1011,7 +1011,7 @@ binary_sensor:
   # 10 kOhm: the AM312 output is weak and drops to ~1.5 V (never detected).
   - platform: gpio
     id: pir
-    name: Movimento ingresso
+    name: Entrance Motion
     device_class: motion
     pin: GPIO34                  # input only, ideal for the PIR
     filters:
@@ -1023,7 +1023,7 @@ binary_sensor:
   # --- Doorbell push button ---------------------------------------
   - platform: gpio
     id: doorbell_button
-    name: Pulsante campanello
+    name: Doorbell Button
     pin:
       number: GPIO33
       mode: INPUT_PULLUP
@@ -1036,7 +1036,7 @@ binary_sensor:
 
   - platform: fingerprint_grow
     id: fp_enrolling
-    name: Registrazione in corso
+    name: Fingerprint Enrolling
     on_press:
       - script.execute: screen_wake
       - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_start}" }
@@ -1051,7 +1051,7 @@ binary_sensor:
           red: 0%
           green: 30%
           blue: 100%
-          effect: Scansione
+          effect: Scan
     # When enrollment ends, fails or is cancelled, go back to the state colour
     on_release:
       - delay: 2s
@@ -1063,7 +1063,7 @@ switch:
   # red and the display says so. The state survives reboots.
   - platform: template
     id: sw_reader_off
-    name: Disattiva lettore impronte
+    name: Disable Fingerprint Reader
     icon: mdi:fingerprint-off
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
@@ -1076,17 +1076,17 @@ switch:
             - script.execute: screen_wake
             - text_sensor.template.publish:
                 id: last_event
-                state: "Lettore disattivato da Home Assistant"
+                state: "Reader disabled from Home Assistant"
     on_turn_off:
       - if:
           condition:
             lambda: "return id(tamper_latched);"
           then:
-            # during a tamper event it can only be re-enabled with "Ripristina dopo manomissione"
+            # during a tamper event it can only be re-enabled with "Reset Tamper"
             - switch.turn_on: sw_reader_off
             - text_sensor.template.publish:
                 id: last_event
-                state: "Manomissione attiva: usa Ripristina dopo manomissione"
+                state: "Tamper active: use Reset Tamper"
           else:
             - if:
                 condition:
@@ -1096,12 +1096,12 @@ switch:
                   - script.execute: screen_wake
                   - text_sensor.template.publish:
                       id: last_event
-                      state: "Lettore riattivato da Home Assistant"
+                      state: "Reader re-enabled from Home Assistant"
 
 button:
   # Ring the doorbell on the indoor buzzer (test / call from HA)
   - platform: template
-    name: Suona campanello interno
+    name: Ring Indoor Chime
     icon: mdi:bell-ring
     on_press:
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_bell}" }
@@ -1109,7 +1109,7 @@ button:
   # Reset after a tamper event: only works with the plate mounted again
   - platform: template
     id: btn_tamper_reset
-    name: Ripristina dopo manomissione
+    name: Reset Tamper
     icon: mdi:shield-refresh
     on_press:
       - if:
@@ -1118,7 +1118,7 @@ button:
           then:
             - text_sensor.template.publish:
                 id: last_event
-                state: "Ripristino rifiutato: la placca risulta ancora aperta"
+                state: "Reset refused: the plate is still open"
           else:
             - globals.set: { id: tamper_latched, value: "false" }
             - switch.turn_off: sw_reader_off
@@ -1126,13 +1126,13 @@ button:
             - script.execute: screen_wake
             - text_sensor.template.publish:
                 id: last_event
-                state: "Manomissione ripristinata, lettore riattivato"
+                state: "Tamper reset, reader re-enabled"
 
   # Button on the device page in HA: cancel the alarm and unlock
   # the reader without waiting ${lockout_minutes} minutes
   - platform: template
     id: btn_reset_alarm
-    name: Sblocca lettore impronte
+    name: Reset Fingerprint Alarm
     icon: mdi:fingerprint
     on_press:
       - if:
@@ -1143,21 +1143,21 @@ button:
             - logger.log: "Alarm cancelled from Home Assistant"
 
 event:
-  # "Campanello" (doorbell) event for HA automations (notifications, chimes...)
+  # Doorbell event for HA automations (notifications, chimes...)
   - platform: template
     id: doorbell_event
-    name: Campanello
+    name: Doorbell
     device_class: doorbell
     event_types:
-      - "premuto"
+      - "pressed"
 
 number:
   # Minimum confidence on top of the sensor's own threshold.
   # Lower it if valid fingerprints are rejected with "Lettura incerta"
-  # (uncertain reading); check the "Ultima confidenza" sensor to pick it.
+  # (uncertain reading on the display); check "Last Fingerprint Confidence".
   - platform: template
     id: min_confidence
-    name: Soglia confidenza impronte
+    name: Fingerprint Confidence Threshold
     icon: mdi:fingerprint
     min_value: 0
     max_value: 200
@@ -1172,9 +1172,9 @@ text_sensor:
   # Human-readable tamper status, handy for dashboards and badges
   - platform: template
     id: tamper_status
-    name: Stato antimanomissione
+    name: Tamper Status
     icon: mdi:shield-lock
     # updated by the interval block only when the state changes
   - platform: template
     id: last_event
-    name: Ultimo evento
+    name: Last Event

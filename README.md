@@ -22,7 +22,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | File | What it is |
 |---|---|
 | `nuki_fingerprint.yaml` | ESPHome configuration. Wiring is documented in the header. |
-| `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics. |
+| `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics (its diagnostic entity names are still in Italian, since other devices share it). |
 | `common/secrets.example.yaml` | Secrets you need to provide (copy to `secrets.yaml`). |
 | `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). |
 | `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip window, indoor buzzer, separate 230 V bay. |
@@ -46,10 +46,24 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 
 1. Copy `nuki_fingerprint.yaml` and the `common/` folder into your ESPHome config folder.
 2. Create `common/secrets.yaml` from the example (secrets for an included package are looked up next to the package file).
-3. Pair the Nuki: turn on the "Accoppiamento Nuki" (pairing) switch, then hold the button on the lock until the ring lights up.
+3. Pair the Nuki: turn on the "Nuki Pairing Mode" switch, then hold the button on the lock until the ring lights up.
 4. Enroll fingerprints with the `enroll` action (`finger_id`, `num_scans`).
 
-Entity names, on-screen messages and event texts are in Italian. Change them freely, but keep in mind that renaming an entity changes its `entity_id` in Home Assistant.
+### Home Assistant actions
+
+| Action | Data |
+|---|---|
+| `esphome.nuki_fingerprint_enroll` | `finger_id`, `num_scans` |
+| `esphome.nuki_fingerprint_cancel_enroll` | |
+| `esphome.nuki_fingerprint_delete` | `finger_id` |
+| `esphome.nuki_fingerprint_delete_all` | |
+| `esphome.nuki_fingerprint_reset_alarm` | |
+| `esphome.nuki_fingerprint_play_indoor` | `tune` (RTTTL string) |
+| `esphome.nuki_fingerprint_stop_indoor` | |
+
+The doorbell is an `event` entity ("Doorbell") with event type `pressed`.
+
+Home Assistant entities and texts are in English; the messages on the OLED display are in Italian and can be changed in the display lambda and the `show_msg` calls. Renaming an entity changes its `entity_id` in Home Assistant.
 
 ## Safety
 

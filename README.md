@@ -8,7 +8,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 
 ## Features
 
-- **Full Nuki control from Home Assistant**: the ESP32 replaces the Nuki Bridge, so the lock is still a regular `lock` entity you can lock, unlock and open from the HA app, dashboards and automations, together with battery level, door sensor and Bluetooth signal. Changes made from the Nuki app, the keypad or by hand show up immediately.
+- **Full Nuki control from Home Assistant**: the ESP32 replaces the Nuki Bridge, so the lock is still a regular `lock` entity you can lock, unlock and open from the HA app, dashboards and automations, together with battery level, door sensor and Bluetooth signal. Changes made from the Nuki app or by hand show up immediately.
 - **Fingerprint unlock** (R503 reader) with a configurable confidence threshold and sensor password protection against swapping the sensor.
 - **Alarm after 3 wrong fingerprints**: reader locked for 15 minutes, siren, Home Assistant entities for notifications. The lockout survives reboots and power cuts.
 - **Tamper detection** (reed switch behind the outdoor plate): reader disabled until reset from Home Assistant.

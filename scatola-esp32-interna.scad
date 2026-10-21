@@ -26,6 +26,7 @@
 //  PRIMA DI STAMPARE misura la tua scheda a morsetti e correggi
 //  board_w / board_h e board_hole_dx / board_hole_dy: le schede
 //  in commercio non sono tutte uguali.
+//  VERSIONE SENZA ALIMENTATORE BACKUPPATO DA BATTERIE
 // ============================================================
 
 /* [Parte da esportare] */

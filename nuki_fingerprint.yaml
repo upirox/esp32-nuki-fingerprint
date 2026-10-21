@@ -27,6 +27,12 @@
 #   Microinterruttore antimanomissione (contatto NA, premuto a placca montata)
 #         un capo -> GPIO19   altro capo -> GND   (pull-up interno)
 #         placca montata = contatto chiuso; placca rimossa o filo tagliato = allarme
+#   Alimentazione di backup (PowerBoost 1000C + 3 x 18650 in parallelo)
+#         rete presente: +5V alimentatore -> 10k -> GPIO36 -> 20k -> GND
+#         batteria:      BAT PowerBoost   -> 100k -> GPIO39 -> 100k -> GND
+#                                            (+ 100 nF tra GPIO39 e GND)
+#         Durante il blackout: striscia al 30%, anello del pulsante spento a
+#         riposo e al 60% quando si accende il display.
 #
 #  Striscia LED:
 #    verde tenue fisso  = porta chiusa
@@ -449,20 +455,36 @@ script:
           condition:
             lambda: "return !id(doorbell_ringing);"
           then:
-            - light.turn_on: { id: ring, brightness: 100%, effect: None }
+            - light.turn_on:
+                id: ring
+                effect: None
+                brightness: !lambda "return id(mains_ok).state ? 1.0 : 0.6;"
       - delay: 30s
       - if:
           condition:
             lambda: "return !id(locked_out) && !id(tamper_latched);"
           then:
             - lambda: "id(oled).turn_off();"
-            - light.turn_on: { id: ring, brightness: 25%, effect: None }
             - globals.set: { id: screen_on, value: "false" }
+            - script.execute: ring_rest
             - if:
                 condition:
                   lambda: "return !id(fp_enrolling).state;"
                 then:
                   - script.execute: aura_idle    # anello del sensore spento
+
+  # Anello del pulsante a riposo (display spento): 25% con la rete,
+  # spento durante il blackout per risparmiare batteria
+  - id: ring_rest
+    mode: restart
+    then:
+      - if:
+          condition:
+            binary_sensor.is_on: mains_ok
+          then:
+            - light.turn_on: { id: ring, brightness: 25%, effect: None }
+          else:
+            - light.turn_off: ring
 
   # Colore della striscia in base allo stato di allarme e del Nuki
   - id: restore_strip
@@ -491,6 +513,8 @@ script:
                 b = 1; br = 0.15f; break;                      // sconosciuto
             }
           }
+          // a batteria: striscia al 30% (l'allarme resta pieno)
+          if (!id(mains_ok).state && !id(locked_out)) br *= 0.3f;
           call.set_rgb(r, g, b);
           call.set_brightness(br);
           call.set_effect(fx);
@@ -581,7 +605,15 @@ script:
           state: "Campanello suonato"
       - delay: 3s
       - globals.set: { id: doorbell_ringing, value: "false" }
-      - light.turn_on: { id: ring, brightness: 100%, effect: None }
+      - light.turn_on:
+          id: ring
+          effect: None
+          brightness: !lambda "return id(mains_ok).state ? 1.0 : 0.6;"
+      - if:
+          condition:
+            lambda: "return !id(screen_on);"
+          then:
+            - script.execute: ring_rest
       - delay: 2s
 
   # Mostra un messaggio per 4 secondi, poi torna a quello di attesa
@@ -833,6 +865,51 @@ fingerprint_grow:
     - script.execute: flash_error
 
 sensor:
+  # --- Batteria di backup -------------------------------------------
+  # Tensione della cella letta su GPIO39 attraverso il partitore 100k/100k
+  # (meta' tensione). Media su 6 letture: un valore al minuto.
+  - platform: adc
+    id: batt_voltage
+    name: Tensione batteria
+    pin: GPIO39
+    attenuation: 12db
+    update_interval: 10s
+    accuracy_decimals: 2
+    unit_of_measurement: V
+    device_class: voltage
+    entity_category: diagnostic
+    filters:
+      - multiply: 2.0                 # partitore 1:2
+      - sliding_window_moving_average:
+          window_size: 6
+          send_every: 6
+    on_value:
+      - component.update: batt_percent
+
+  # Percentuale stimata dalla curva di scarica di una cella Li-ion.
+  # Con la rete presente la cella e' in carica: la percentuale e' indicativa.
+  - platform: template
+    id: batt_percent
+    name: Batteria
+    unit_of_measurement: "%"
+    device_class: battery
+    accuracy_decimals: 0
+    update_interval: never
+    lambda: |-
+      const float v = id(batt_voltage).state;
+      if (isnan(v)) return {};
+      static const float pts[][2] = {
+        {3.00, 0}, {3.30, 5}, {3.50, 12}, {3.60, 22}, {3.70, 38},
+        {3.80, 55}, {3.90, 68}, {4.00, 80}, {4.10, 92}, {4.20, 100}};
+      if (v <= pts[0][0]) return 0.0f;
+      for (int i = 1; i < 10; i++) {
+        if (v <= pts[i][0]) {
+          float t = (v - pts[i-1][0]) / (pts[i][0] - pts[i-1][0]);
+          return pts[i-1][1] + t * (pts[i][1] - pts[i-1][1]);
+        }
+      }
+      return 100.0f;
+
   - platform: fingerprint_grow
     fingerprint_count:
       name: Impronte registrate
@@ -842,6 +919,52 @@ sensor:
       name: Ultima confidenza
 
 binary_sensor:
+  # Corrente di rete sulla linea dell'ESP32 (5 V dell'alimentatore, prima
+  # del PowerBoost). on = rete presente, off = blackout: si va a batteria.
+  # Il ritardo ignora i cali brevissimi e i piccoli disturbi che l'ADC su
+  # GPIO39 puo' indurre su GPIO36 (difetto noto dell'ESP32).
+  - platform: gpio
+    id: mains_ok
+    name: Alimentazione di rete
+    device_class: power
+    pin: GPIO36                      # solo ingresso, pull-down = R 20k esterna
+    filters:
+      - delayed_on: 2s
+      - delayed_off: 2s
+    on_release:
+      - if:
+          condition:
+            lambda: "return id(booted);"
+          then:
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Corrente assente: funzionamento a batteria"
+            - logger.log:
+                level: WARN
+                format: "Rete assente: modalita' risparmio"
+      # striscia e anello si adeguano sempre, anche durante l'avvio
+      - script.execute: restore_strip
+      - if:
+          condition:
+            lambda: "return !id(screen_on);"
+          then:
+            - script.execute: ring_rest
+    on_press:
+      - if:
+          condition:
+            lambda: "return id(booted);"
+          then:
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Corrente di rete tornata"
+      # striscia e anello si adeguano sempre, anche durante l'avvio
+      - script.execute: restore_strip
+      - if:
+          condition:
+            lambda: "return !id(screen_on);"
+          then:
+            - script.execute: ring_rest
+
   # Stato istantaneo del microinterruttore (on = placca rimossa o filo tagliato)
   - platform: gpio
     id: plate_open

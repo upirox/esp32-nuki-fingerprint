@@ -2,11 +2,15 @@
 //  Placca su misura per scatola 503
 //  Display OLED 0.96" SPI | Lettore R503 | PIR AM312 | Pulsante campanello | Buzzer
 //  Contatto reed antimanomissione (magnete incollato dentro la scatola)
-//  Guarnizione perimetrale in TPU (stampa multimateriale o separata)
+//  Tenuta perimetrale: cordone in gomma nitrilica da 2 mm incastrato in
+//  un solco sul retro (seal = "cordone"), oppure guarnizione in TPU
+//  stampata a parte o in multimateriale (seal = "tpu").
 //
-//  STAMPA MULTIMATERIALE: esporta due STL, uno con part = "placca" e uno
-//  con part = "guarnizione", importali insieme nello slicer come un unico
-//  oggetto multiparte e assegna ASA/PETG alla placca e TPU alla guarnizione.
+//  CORDONE: taglialo lungo quanto il solco, partendo da un lato
+//  dell'apertura di drenaggio in basso e finendo dall'altro. Spingilo
+//  nel solco senza tirarlo (se lo stiri poi si ritira), sigilla le due
+//  estremita' con una goccia di colla ciano. Sporge ~0,5 mm e si schiaccia
+//  stringendo le viti.
 //
 //  Si avvita direttamente alla scatola 503 (interasse viti 83,5 mm)
 //  al posto di supporto + placca standard.
@@ -18,7 +22,7 @@
 /* [Placca] */
 plate_w      = 120;   // larghezza
 plate_h      = 80;    // altezza
-plate_t      = 3;     // spessore (il dado dell'R503 serra fino a ~10 mm)
+plate_t      = 3.5;   // spessore (il dado dell'R503 serra fino a ~10 mm)
 corner_r     = 5;     // raggio degli angoli
 edge_chamfer = 0.8;   // smusso del bordo frontale
 
@@ -87,8 +91,19 @@ reed_w        = 3.5;   // corpo 3,2 mm + gioco
 reed_wall     = 1.2;   // spessore pareti della culla
 reed_wall_h   = 3.4;   // altezza pareti (il reed sta tutto dentro)
 
-/* [Guarnizione TPU] */
-part             = "tutto";  // "placca", "guarnizione" o "tutto" (anteprima)
+/* [Tenuta] */
+part             = "tutto";  // "placca", "guarnizione" (solo TPU) o "tutto" (anteprima)
+seal             = "cordone";// "cordone" (nitrile nel solco), "tpu" o "nessuna"
+
+/* [Cordone in gomma nitrilica] */
+cord_d           = 2;        // diametro del cordone
+groove_w         = 2.0;      // larghezza solco: = diametro, il cordone resta in sede
+                             // (2,1 se fatica a entrare)
+groove_depth     = 1.45;     // profondita': sporge ~0,55 mm, schiacciamento ~27%
+groove_inset     = 3;        // distanza dal bordo della placca al solco
+                             // (per un cordone da 3 mm: groove_w 3, depth 2,2, plate_t 4)
+
+/* [Guarnizione TPU (solo se seal = "tpu")] */
 gasket_inset     = 2.5;      // distanza dal bordo della placca
 gasket_w         = 3;        // larghezza del cordone
 gasket_h         = 1.6;      // altezza (si schiaccia a ~1 mm serrando le viti)
@@ -184,19 +199,27 @@ module reed_cradle() {
         }
 }
 
-// anello della guarnizione (in pianta), con apertura di drenaggio in basso
-module gasket_ring_2d() {
-    ow = plate_w - 2*gasket_inset;
-    oh = plate_h - 2*gasket_inset;
-    r  = max(corner_r - gasket_inset, 0.5);
+// anello perimetrale (in pianta) largo w a distanza inset dal bordo,
+// con apertura di drenaggio in basso
+module ring_2d(inset, w) {
+    ow = plate_w - 2*inset;
+    oh = plate_h - 2*inset;
+    r  = max(corner_r - inset, 0.5);
+    ri = max(r - w, 0.1);
     difference() {
         offset(r) square([ow - 2*r, oh - 2*r], center = true);
-        offset(max(r - gasket_w, 0.1))
-            square([ow - 2*gasket_w - 2*max(r - gasket_w, 0.1),
-                    oh - 2*gasket_w - 2*max(r - gasket_w, 0.1)], center = true);
+        offset(ri) square([ow - 2*w - 2*ri, oh - 2*w - 2*ri], center = true);
         if (gasket_drain > 0)
-            translate([-gasket_drain/2, -plate_h/2 - 1]) square([gasket_drain, gasket_w + gasket_inset + 2]);
+            translate([-gasket_drain/2, -plate_h/2 - 1]) square([gasket_drain, w + inset + 2]);
     }
+}
+module gasket_ring_2d() { ring_2d(gasket_inset, gasket_w); }
+module groove_ring_2d() { ring_2d(groove_inset, groove_w); }
+
+// cordone (solo per l'anteprima): sporge dal retro della placca
+module cord_preview() {
+    translate([0, 0, plate_t - groove_depth])
+        linear_extrude(cord_d) offset(-(groove_w - cord_d)/2) groove_ring_2d();
 }
 
 // la guarnizione parte dal fondo della sede e sporge di gasket_h dal retro
@@ -210,8 +233,13 @@ difference() {
     plate_body();
 
     // sede della guarnizione sul retro
-    translate([0, 0, plate_t - gasket_groove])
-        linear_extrude(gasket_groove + 0.01) gasket_ring_2d();
+    if (seal == "tpu")
+        translate([0, 0, plate_t - gasket_groove])
+            linear_extrude(gasket_groove + 0.01) gasket_ring_2d();
+    // solco per il cordone in gomma nitrilica
+    if (seal == "cordone")
+        translate([0, 0, plate_t - groove_depth])
+            linear_extrude(groove_depth + 0.01) groove_ring_2d();
 
     sound_grille();
 
@@ -231,7 +259,8 @@ reed_cradle();
 }
 
 if (part == "placca" || part == "tutto") plate();
-if (part == "guarnizione" || part == "tutto") color("DimGray") gasket();
+if (seal == "tpu" && (part == "guarnizione" || part == "tutto")) color("DimGray") gasket();
+if (seal == "cordone" && part == "tutto") color("Black") cord_preview();
 
 // La faccia frontale e' quella appoggiata sul piano di stampa (z = 0):
 // stampala cosi', senza supporti. Il retro guarda verso l'alto.

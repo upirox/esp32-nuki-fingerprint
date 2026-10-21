@@ -1,6 +1,6 @@
 # ============================================================
 #  ESP32 (38 pin) + lettore R503 + OLED SSD1306 -> Nuki via BLE
-
+# pippo
 #  Lo sblocco avviene in locale sull'ESP32: funziona anche se
 #  Home Assistant o il Wi-Fi sono giu'.
 #

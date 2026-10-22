@@ -5,6 +5,11 @@
 		}
 	],
 	"settings": {
+		// Open the project YAML files as plain YAML, not as Home Assistant
+		// configuration (Studio Code Server default), so the tags below apply
+		"files.associations": {
+			"*.yaml": "yaml"
+		},
 		// Custom tags used by ESPHome (!lambda, !secret, !include...)
 		"yaml.customTags": [
 			"!lambda scalar",

@@ -69,3 +69,23 @@ Home Assistant entities and texts are in English; the messages on the OLED displ
 ## Safety
 
 The indoor enclosure contains a mains power supply. Mains wiring must be done with the power off, through a breaker and RCD, by someone qualified to do it. Keep the 230 V cable sheathed all the way into the 230 V bay, and print the enclosures in PETG or ASA, not PLA.
+
+## Disclaimer
+
+This is a personal hobby project, shared **as is** in the hope that it is useful. It is **not** a certified security or electrical product, and it comes with **no warranty of any kind**.
+
+By using any part of this repository (firmware, enclosures, wiring diagrams, documentation) you accept that:
+
+- **You use it entirely at your own risk.** You are responsible for checking that it is suitable and safe for your installation, and for building, wiring and testing it correctly.
+- **Door access is security-critical.** Bugs, hardware faults, power or radio failures, firmware or library updates may leave a door locked, unlocked or unreachable. Always keep an independent way to open the door (a mechanical key) and never rely on this project as your only means of access or protection.
+- **Mains voltage (230 V) can kill and can start fires.** Any work on mains wiring must be carried out with the power off, in compliance with the electrical regulations of your country, and by a qualified person where required.
+- **Lithium batteries can overheat, swell or catch fire** if damaged, short-circuited or charged incorrectly.
+- 3D-printed parts, third-party components and libraries (such as ESPHome and the `nuki_lock` component) are outside the author's control.
+
+To the maximum extent permitted by applicable law, the author and contributors **accept no liability** for any damage, injury, loss, theft, property damage or other consequence arising from the use, misuse or inability to use this project. Nothing here is professional advice.
+
+This project is not affiliated with or endorsed by Nuki Home Solutions, Espressif, Adafruit, Mean Well or any other manufacturer mentioned. All trademarks belong to their respective owners.
+
+## License
+
+Released under the [MIT License](LICENSE).

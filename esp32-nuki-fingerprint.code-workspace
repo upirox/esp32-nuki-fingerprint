@@ -5,8 +5,20 @@
 		}
 	],
 	"settings": {
-		"yaml.disableSchemaDetection": [
-			"file:///root/.oh-my-zsh/.github/esp32-nuki-fingerprint/nuki_fingerprint.yaml"
+		// Custom tags used by ESPHome (!lambda, !secret, !include...)
+		"yaml.customTags": [
+			"!lambda scalar",
+			"!secret scalar",
+			"!include scalar",
+			"!include mapping",
+			"!include_dir_named scalar",
+			"!include_dir_list scalar",
+			"!include_dir_merge_list scalar",
+			"!include_dir_merge_named scalar",
+			"!extend scalar",
+			"!remove scalar",
+			"!remove mapping",
+			"!env_var scalar"
 		]
 	}
 }

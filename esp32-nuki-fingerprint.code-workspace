@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"yaml.disableSchemaDetection": [
+			"file:///root/.oh-my-zsh/.github/esp32-nuki-fingerprint/nuki_fingerprint.yaml"
+		]
+	}
+}

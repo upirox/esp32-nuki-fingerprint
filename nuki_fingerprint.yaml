@@ -18,7 +18,7 @@
 #         VCC -> 3V3   GND -> GND   I/O -> GPIO25
 #   INDOOR buzzer next to the ESP32 (same model): doorbell and sirens
 #         VCC -> 3V3   GND -> GND   I/O -> GPIO21
-#   WS2812 strip (8 LEDs)
+#   WS2812B strip, 144 LEDs/m, 12 LEDs (83 mm)
 #         +5V -> VIN   GND -> GND   DIN -> GPIO13 (330 ohm resistor)
 #   AM312 PIR sensor (HW-740)
 #         VCC -> 3V3   GND -> GND   OUT -> GPIO34 (+ 100 kOhm to GND, NOT 10 kOhm)
@@ -229,7 +229,7 @@ light:
     id: strip
     name: Status LED Strip
     pin: GPIO13
-    num_leds: 8
+    num_leds: 12
     chipset: WS2812
     channel_colors: GRB
     default_transition_length: 200ms
@@ -253,7 +253,7 @@ light:
       - addressable_scan:
           name: Scan
           move_interval: 80ms
-          scan_width: 2
+          scan_width: 3
 
   # Push button LED ring: dim while idle, full when someone comes close
   # or touches the reader, blinking while the doorbell rings

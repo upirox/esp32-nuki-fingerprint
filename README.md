@@ -26,7 +26,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics (its diagnostic entity names are still in Italian, since other devices share it). |
 | `common/secrets.example.yaml` | Secrets you need to provide (copy to `secrets.yaml`). |
 | `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The seat for the tamper microswitch is still to be added. |
-| `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip window, indoor buzzer, separate 230 V bay. |
+| `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip with light box and diffuser, indoor buzzer, separate 230 V bay. |
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
@@ -38,7 +38,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - SSD1306 0.96" OLED, 7-pin SPI version (**CS must be wired to a GPIO**, not tied to GND)
 - AM312 PIR (HW-740) with a **100 kΩ** pull-down (10 kΩ is too strong for its output)
 - 2 × passive buzzer modules ("low level trigger"), outdoor and indoor
-- WS2812 strip, 8 LEDs (330 Ω in series with DIN)
+- WS2812B strip, 144 LEDs/m, 10 mm wide (e.g. BTF-LIGHTING ECO IP30), cut to 12 LEDs (330 Ω in series with DIN). The enclosure lid has a light box and a white 1.6 mm diffuser, so the LEDs show as one even bar instead of separate dots. For a 60 LEDs/m strip or an 8-LED stick change `led_n`/`led_pitch` in the enclosure and `num_leds` in the firmware.
 - 19 mm vandal-proof push button with 3–6 V LED ring
 - Subminiature lever microswitch (20 × 10.8 × 6.5 mm, steel lever, C/NO/NC contacts; use C + NO)
 - Reed switch + 6 × 2 mm magnet, wired in series with the microswitch

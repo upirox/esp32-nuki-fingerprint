@@ -2,7 +2,7 @@
 //  Indoor enclosure for the ESP32 - smart entrance
 //  Holds: ESP32 38 pin on a screw terminal expansion board,
 //         indoor buzzer (doorbell / sirens),
-//         8-LED WS2812 strip = door status light,
+//         WS2812B strip, 144 LEDs/m (12 LEDs) = door status light,
 //         PowerBoost 1000C + 3 x 18650 pack (backup battery),
 //         230 V -> 5 V 2 A power supply (Mean Well IRM-10-5) in a
 //         SEPARATE BAY with its own cover (opening the enclosure to work
@@ -14,8 +14,8 @@
 //    "base"     enclosure, printed with the back on the bed
 //    "lid"      printed with the visible face on the bed
 //    "lid230"   cover of the 230 V bay (2 M3 screws)
-//    "diffuser" strip for the LED window: print it in white or
-//               clear (or "natural") PETG, 2-3 layers
+//    "diffuser" strip for the LED window: print it in WHITE PETG,
+//               1.6 mm (about 8 layers), 100% infill
 //    "all"      assembled preview with the lid lifted
 //
 //  Screws: 4 x M3 x 8 in the lid and 2 x M3 x 6 in the 230 V cover,
@@ -28,7 +28,7 @@
 //  230 V goes straight into the bay and never runs among the 5 V wires.
 //
 //  LAYOUT (vertical, outer width < 15 cm):
-//    top      LED status strip (8 cm)
+//    top      LED status strip (12 LEDs, 83 mm) inside a light box
 //    middle   ESP32 board on the left, ABOVE the 3 x 18650 battery pack
 //             (tall standoffs) | PowerBoost 1000C and buzzer on the right
 //    bottom   230 V bay with the power supply (the cable hole straddles
@@ -85,15 +85,20 @@ buzz_ring_h   = 6;
 buzz_ring_w   = 1.2;
 sound_hole_d  = 1.6;
 
-/* [LED status strip (WS2812, 8 LEDs)] */
-led_n      = 8;
-led_pitch  = 10;     // 8 cm strip with 8 LEDs = 10 mm (length = led_n x led_pitch)
-strip_w    = 10.5;   // strip width + clearance
+/* [LED status strip (WS2812B 144 LEDs/m, 10 mm wide PCB)] */
+led_n      = 12;
+led_pitch  = 1000/144; // 144 LEDs/m = 6.94 mm (8 LEDs/80 mm strip: 10) | length = led_n x led_pitch
+strip_w    = 10.6;   // strip width (10 mm PCB) + clearance
 strip_y    = 62;     // strip position (centre, at the top)
-led_gap    = 6;      // LED to lid distance: higher = more even light
+led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window
-diff_t     = 1.0;    // diffuser thickness
+diff_t     = 1.6;    // diffuser thickness (white PETG)
 diff_margin= 2;      // diffuser ledge around the window
+use_lightbox = true; // walls around the strip, hanging from the lid
+box_wall   = 1.2;    // light box wall thickness
+box_clear  = 0.5;    // gap between the light box walls and the rib
+box_wire_w = 7;      // notches at the ends of the light box for the strip wires
+box_wire_h = 3.5;
 
 /* [Cable hole from the wall (in the back), SPLIT in two by the 230 V bay wall] */
 // The hole is centred on the top wall of the bay: the wall runs across it
@@ -365,6 +370,11 @@ module lid_assembled() {
                 translate([0, 0, -0.1]) rrect(in_w - 2*fit - 3.2, in_h - 2*fit - 3.2, 0.5, 3.2);
                 for (p = boss_pos) translate([p[0], p[1], -0.1]) cylinder(d = boss_d + 1, h = 3.2);
             }
+            // light box: white walls around the strip, from the lid down to just
+            // above the LED rib. Light bounces inside and leaves only through the
+            // diffuser, so the LEDs merge into one even bar. Print the lid in white
+            // or line the inside of the box with white paint / aluminium tape.
+            if (use_lightbox) lightbox();
             // ring that holds the buzzer
             translate([buzz_x, buzz_y, z0 - buzz_ring_h])
             difference() {
@@ -388,6 +398,22 @@ module lid_assembled() {
         for (p = concat([[0,0]], [for (a = [0:60:300]) [3.2*cos(a), 3.2*sin(a)]]))
             translate([buzz_x + p[0], buzz_y + p[1], z0 - 0.1])
                 cylinder(d = sound_hole_d, h = lid_t + 0.2, $fn = 24);
+    }
+}
+
+module lightbox() {
+    rib_top = base_h - led_gap - 2;                   // top of the LED rib (see led_rib)
+    h  = base_h - rib_top - box_clear;                // from the lid down to the rib
+    iw = strip_len + 2*box_clear;                     // inside: the rib + rails fit in
+    ih = strip_w + 2 + 2*box_clear;
+    translate([0, strip_y, base_h - h])
+    difference() {
+        // +0.5 mm into the lid, so the union is a clean solid
+        translate([-iw/2 - box_wall, -ih/2 - box_wall, 0]) cube([iw + 2*box_wall, ih + 2*box_wall, h + 0.5]);
+        translate([-iw/2, -ih/2, -0.1]) cube([iw, ih, h + 0.7]);
+        // wire notches at both ends (the strip can face either way)
+        for (sx = [-1, 1]) translate([sx*(iw/2 + box_wall/2) - box_wall, -box_wire_w/2, -0.1])
+            cube([2*box_wall, box_wire_w, box_wire_h + 0.1]);
     }
 }
 

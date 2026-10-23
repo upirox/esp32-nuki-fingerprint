@@ -11,7 +11,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - **Full Nuki control from Home Assistant**: the ESP32 replaces the Nuki Bridge, so the lock is still a regular `lock` entity you can lock, unlock and open from the HA app, dashboards and automations, together with battery level, door sensor and Bluetooth signal. Changes made from the Nuki app or by hand show up immediately.
 - **Fingerprint unlock** (R503 reader) with a configurable confidence threshold and sensor password protection against swapping the sensor.
 - **Alarm after 3 wrong fingerprints**: reader locked for 15 minutes, siren, Home Assistant entities for notifications. The lockout survives reboots and power cuts.
-- **Tamper detection** (reed switch behind the outdoor plate): reader disabled until reset from Home Assistant.
+- **Tamper detection**: a lever microswitch and a reed switch **in series** behind the outdoor plate. Removing the plate (or cutting the cable) opens the circuit, disables the reader until it is reset from Home Assistant and sounds the siren. The microswitch is pressed mechanically by the wall box, so it cannot be fooled with a magnet held outside the plate, which would keep a reed alone closed; the reed stays as a second, independent sensor.
 - **OLED display** woken by a PIR sensor, with messages that follow the lock state.
 - **LED status strip** indoors: green = locked, red = unlocked, yellow = moving, purple = jammed, blue = Nuki unreachable.
 - **Doorbell** push button with LED ring; double ding-dong on an indoor buzzer, plus a Home Assistant `event` entity.
@@ -25,7 +25,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `nuki_fingerprint.yaml` | ESPHome configuration. Wiring is documented in the header. |
 | `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics (its diagnostic entity names are still in Italian, since other devices share it). |
 | `common/secrets.example.yaml` | Secrets you need to provide (copy to `secrets.yaml`). |
-| `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). |
+| `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The seat for the tamper microswitch is still to be added. |
 | `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip window, indoor buzzer, separate 230 V bay. |
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
@@ -40,9 +40,18 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - 2 × passive buzzer modules ("low level trigger"), outdoor and indoor
 - WS2812 strip, 8 LEDs (330 Ω in series with DIN)
 - 19 mm vandal-proof push button with 3–6 V LED ring
-- Reed switch + 6 × 2 mm magnet
+- Subminiature lever microswitch (20 × 10.8 × 6.5 mm, steel lever, C/NO/NC contacts; use C + NO)
+- Reed switch + 6 × 2 mm magnet, wired in series with the microswitch
 - Mean Well IRM-10-5 (5 V 2 A) with fuse, varistor and output capacitors
 - Adafruit PowerBoost 1000C + single-cell Li-ion pack (3.7 V)
+
+### Tamper switch wiring
+
+```
+GPIO19 ──── microswitch C ──── microswitch NO ──── reed ──── GND
+```
+
+Both contacts are closed while the plate is screwed on, so GPIO19 reads LOW. If either opens (plate removed, cable cut, microswitch released even with a magnet holding the reed) the input goes HIGH through the internal pull-up and the tamper alarm fires. The firmware sees a single contact, so no configuration change is needed when adding the microswitch.
 
 ## Getting started
 

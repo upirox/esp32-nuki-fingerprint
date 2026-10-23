@@ -26,9 +26,11 @@
 #         one side -> GPIO33   other side -> GND   (internal pull-up)
 #   Push button LED ring (3-6 V version)
 #         LED+ -> GPIO32      LED- -> GND
-#   Tamper switch (NO contact / reed, closed while the plate is mounted)
-#         one side -> GPIO19   other side -> GND   (internal pull-up)
-#         plate mounted = contact closed; plate removed or wire cut = alarm
+#   Tamper: lever microswitch (C + NO) and reed switch IN SERIES, both
+#   closed while the plate is mounted (the microswitch can't be fooled
+#   with a magnet like a reed alone)
+#         GPIO19 -> microswitch C -> NO -> reed -> GND   (internal pull-up)
+#         plate mounted = circuit closed; plate removed or wire cut = alarm
 #   Backup power (PowerBoost 1000C + 3 x 18650 in parallel)
 #         mains present: +5V power supply -> 10k -> GPIO36 -> 20k -> GND
 #         battery:       PowerBoost BAT   -> 100k -> GPIO39 -> 100k -> GND

@@ -26,7 +26,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics (its diagnostic entity names are still in Italian, since other devices share it). |
 | `common/secrets.example.yaml` | Secrets you need to provide (copy to `secrets.yaml`). |
 | `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The seat for the tamper microswitch is still to be added. |
-| `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip with light box and diffuser, indoor buzzer, separate 230 V bay. |
+| `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip with light box and diffuser, indoor buzzer, separate 230 V bay. Mounted next to an indoor wall socket: 230 V enters the bay through a gland in the bottom wall, signal cables leave through a slot in the right wall (no mains in the outdoor box). |
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
@@ -78,7 +78,7 @@ Home Assistant entities and texts are in English; the messages on the OLED displ
 
 ## Safety
 
-The indoor enclosure contains a mains power supply. Mains wiring must be done with the power off, through a breaker and RCD, by someone qualified to do it. Keep the 230 V cable sheathed all the way into the 230 V bay, and print the enclosures in PETG or ASA, not PLA.
+The indoor enclosure contains a mains power supply. Mains wiring must be done with the power off, through a breaker and RCD, by someone qualified to do it. Keep the 230 V cable sheathed all the way into the 230 V bay (at least 1.5 mm² if it is wired to a socket's terminals), never bring mains into the outdoor box, and print the enclosures in PETG or ASA, not PLA.
 
 ## Disclaimer
 

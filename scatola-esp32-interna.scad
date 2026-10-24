@@ -7,8 +7,14 @@
 //         230 V -> 5 V 2 A power supply (Mean Well IRM-10-5) in a
 //         SEPARATE BAY with its own cover (opening the enclosure to work
 //         on the board never exposes live parts).
-//  It is screwed to the wall behind the outdoor plate: the cables come
-//  in through the hole in the back, lined up with the hole in the wall.
+//  It is screwed to the wall indoors, next to the 503 box of a wall socket:
+//  - signal cables to the outdoor plate leave through a rectangular slot
+//    in the middle of the right wall, flush with the back, and go into the
+//    nearby 503 box (and on through the wall conduit) under a small trunking;
+//  - 230 V from the socket enters the bay through a cable gland in the
+//    bottom wall.
+//  (Set use_back_hole = true for the old layout: box straight behind the
+//   plate, cables through a hole in the back split by the bay wall.)
 //
 //  PARTS (set "part" and export one STL for each):
 //    "base"     enclosure, printed with the back on the bed
@@ -23,16 +29,16 @@
 //          ~220-240 C for PETG, keep the insert straight, don't force it),
 //          4 x 4 mm screws + wall plugs for the wall.
 //  Material: PETG or ASA (NOT PLA: there is a 230 V power supply inside).
-//  The mains cable comes through the same hole in the wall as the signal
-//  cables: the hole in the back is split in two by the wall of the bay, so
-//  230 V goes straight into the bay and never runs among the 5 V wires.
+//  230 V and signal cables enter on different sides: 230 V goes straight
+//  into the bay and never runs among the 5 V wires.
+//  Mains cable: sheathed, at least 1.5 mm2 (e.g. H05VV-F 3G1.5) if wired
+//  to the socket terminals.
 //
 //  LAYOUT (vertical, outer width < 15 cm):
 //    top      LED status strip (12 LEDs, 83 mm) inside a light box
 //    middle   ESP32 board on the left, ABOVE the 3 x 18650 battery pack
 //             (tall standoffs) | PowerBoost 1000C and buzzer on the right
-//    bottom   230 V bay with the power supply (the cable hole straddles
-//             its top wall)
+//    bottom   230 V bay with the power supply (gland in the bottom wall)
 //
 //  BEFORE PRINTING measure your screw terminal board and adjust
 //  board_w / board_h and board_hole_dx / board_hole_dy: boards on the
@@ -100,7 +106,14 @@ box_clear  = 0.5;    // gap between the light box walls and the rib
 box_wire_w = 7;      // notches at the ends of the light box for the strip wires
 box_wire_h = 3.5;
 
-/* [Cable hole from the wall (in the back), SPLIT in two by the 230 V bay wall] */
+/* [Signal cable slot (right wall, flush with the back)] */
+use_sig_slot = true;
+sig_slot_y   = 0;     // centre of the slot along the right wall (0 = middle)
+sig_slot_w   = 16;    // width (along the wall): fits a 15 x 10 trunking
+sig_slot_h   = 11;    // height from the wall surface
+
+/* [OLD layout: cable hole in the back, split by the 230 V bay wall] */
+use_back_hole = false;
 // The hole is centred on the top wall of the bay: the wall runs across it
 // and splits it in two halves. The 230 V cable enters below (straight into the bay),
 // the plate's signal cables enter above. It can only be moved horizontally.
@@ -133,9 +146,9 @@ mod_l      = 46;    // Mean Well IRM-10-5: 45.7 x 25.4 x 21.5 (other module: mea
 mod_w      = 25.5;
 mod_x      = -20;   // module centre
 mod_y      = -50;
-use_gland  = false; // cable gland in the bottom wall (not needed: 230 V enters through the split hole)
+use_gland  = true;  // mains cable gland in the bottom wall of the bay
 gland_x    = 35;
-gland_d    = 12.6;
+gland_d    = 16.2;  // M16 gland (cable 4.5-10 mm, e.g. 3G1.5); 12.6 for M12
 out_hole_d = 6;     // 5 V wires to the board (top wall of the bay)
 out_hole_x = -40;
 
@@ -223,9 +236,12 @@ module base() {
         for (sx = [-1,1], sy = [-1,1])
             translate([board_x + sx*board_hole_dx/2, board_y + sy*board_hole_dy/2, 1])
                 cylinder(d = standoff_pilot, h = base_h);
-        // cable hole from the wall
-        // (the bay wall stays: it splits the hole in two)
-        difference() {
+        // signal cable slot: right wall, middle, open at the back
+        if (use_sig_slot)
+            translate([in_w/2 - 1, sig_slot_y - sig_slot_w/2, -0.1])
+                cube([wall + 2, sig_slot_w, sig_slot_h + 0.1]);
+        // OLD: cable hole from the wall (the bay wall stays: it splits the hole in two)
+        if (use_back_hole) difference() {
             translate([cable_x, cable_y, -0.1]) cylinder(d = cable_d, h = floor_t + 0.2);
             translate([cable_x - cable_d, psu_y1 - psu_wall - 0.1, -1]) cube([2*cable_d, psu_wall + 0.2, floor_t + 2]);
         }

@@ -42,7 +42,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - 19 mm vandal-proof push button with 3–6 V LED ring
 - Subminiature lever microswitch (20 × 10.8 × 6.5 mm, steel lever, C/NO/NC contacts; use C + NO)
 - Reed switch + 6 × 2 mm magnet, wired in series with the microswitch
-- Mean Well IRM-10-5 (5 V 2 A) with fuse, varistor and output capacitors
+- Mean Well IRM-10-5 (5 V 2 A) with fuse, varistor and output capacitors, on an 80 × 40 mm perfboard (cut from a 70 × 90 one) with screw terminals; keep at least 6 mm between the 230 V and the 5 V copper
 - Adafruit PowerBoost 1000C + single-cell Li-ion pack (3.7 V)
 
 ### Tamper switch wiring

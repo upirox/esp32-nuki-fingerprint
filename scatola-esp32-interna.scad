@@ -22,8 +22,10 @@
 //    "base"     enclosure, printed with the back on the bed
 //    "lid"      printed with the visible face on the bed
 //    "lid230"   cover of the 230 V bay (2 M3 screws)
-//    "diffuser" strip for the LED window: print it in WHITE PETG,
-//               1.6 mm (about 8 layers), 100% infill
+//    "diffuser" strip for the LED window, only if diff_type = "printed":
+//               print it in WHITE PETG, 1.6 mm, 100% infill.
+//               With diff_type = "pmma" (default) buy an OPAL (milk white)
+//               acrylic bar instead, cut to diff_pmma_l x diff_pmma_w
 //    "all"      assembled preview with the lid lifted
 //
 //  Screws: 4 x M3 x 8 in the lid and 2 x M3 x 6 in the 230 V cover,
@@ -100,7 +102,9 @@ strip_w    = 10.6;   // strip width (10 mm PCB) + clearance
 strip_y    = 62;     // strip position (centre, at the top)
 led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window
-diff_t     = 1.6;    // diffuser thickness (white PETG)
+diff_type  = "pmma"; // "pmma": opal acrylic bar inside the light box, against the lid
+                     // "printed": printed diffuser in a pocket in the lid
+diff_t     = 2;      // diffuser thickness: 2 mm opal PMMA (printed: 1.6)
 diff_margin= 2;      // diffuser ledge around the window
 use_lightbox = true; // walls around the strip, hanging from the lid
 box_wall   = 1.2;    // light box wall thickness
@@ -183,6 +187,12 @@ out_w = in_w + 2*wall;
 out_h = in_h + 2*wall;
 base_h = floor_t + in_d;
 strip_len = led_n * led_pitch;
+// LED to diffuser = led_gap: with the acrylic bar below the lid the rib is lower
+rib_top = base_h - led_gap - 2 - (use_lightbox && diff_type == "pmma" ? diff_t : 0);
+box_iw = strip_len + 2*box_clear;          // light box inside
+box_ih = strip_w + 2 + 2*box_clear;
+diff_pmma_l = box_iw - 0.4;                // acrylic bar: fits inside the light box
+diff_pmma_w = box_ih - 0.4;
 win_w = strip_len - 4;
 // the columns sink 0.5 mm into the walls: if they were merely tangent
 // OpenSCAD would report "not a valid 2-manifold"
@@ -295,7 +305,7 @@ module board_corner_guides() {
 
 // hollow beam carrying the LED strip, facing the lid
 module led_rib() {
-    top = base_h - led_gap - 2;     // 2 mm = strip + LED thickness
+    top = rib_top;                  // 2 mm below = strip + LED thickness
     w = strip_w + 2;
     translate([0, strip_y, 0])
     difference() {
@@ -429,7 +439,7 @@ module lid_assembled() {
         // light window + diffuser pocket (on the inside)
         translate([0, strip_y, z0 - 0.1])
             linear_extrude(lid_t + 0.2) offset(win_h/2 - 0.01) square([win_w - win_h, 0.02], center = true);
-        translate([0, strip_y, z0 - 0.1])
+        if (diff_type == "printed") translate([0, strip_y, z0 - 0.1])
             linear_extrude(diff_t + 0.1)
                 offset(win_h/2 + diff_margin) square([win_w - win_h, 0.02], center = true);
         // small holes for the buzzer
@@ -440,10 +450,9 @@ module lid_assembled() {
 }
 
 module lightbox() {
-    rib_top = base_h - led_gap - 2;                   // top of the LED rib (see led_rib)
     h  = base_h - rib_top - box_clear;                // from the lid down to the rib
-    iw = strip_len + 2*box_clear;                     // inside: the rib + rails fit in
-    ih = strip_w + 2 + 2*box_clear;
+    iw = box_iw;                                      // inside: the rib + rails fit in
+    ih = box_ih;
     translate([0, strip_y, base_h - h])
     difference() {
         // +0.5 mm into the lid, so the union is a clean solid
@@ -462,18 +471,23 @@ module lid_print() {
 
 // ---------------- DIFFUSER ----------------
 module diffuser() {
-    linear_extrude(diff_t - 0.15)
-        offset(win_h/2 + diff_margin - 0.25) square([win_w - win_h, 0.02], center = true);
+    if (diff_type == "printed")
+        linear_extrude(diff_t - 0.15)
+            offset(win_h/2 + diff_margin - 0.25) square([win_w - win_h, 0.02], center = true);
+    else   // the acrylic bar (preview only)
+        translate([-diff_pmma_l/2, -diff_pmma_w/2, 0]) cube([diff_pmma_l, diff_pmma_w, diff_t]);
 }
 
 // ------------------------------------------------------------
 if (part == "base") base();
 if (part == "lid") lid_print();
 if (part == "diffuser") diffuser();
+echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm") : "printed, part = diffuser"));
 if (part == "lid230") psu_lid();
 if (part == "all") {
     base();
     color("OrangeRed") translate([psu_x0, psu_y0 + fit, psu_ztop + 8]) psu_lid();
     color("SteelBlue", 0.6) translate([0, 0, 25]) lid_assembled();
     color("White") translate([0, strip_y, base_h + 25 - 0.05]) mirror([0,0,1]) diffuser();
+    // (pmma: the bar lies inside the light box, against the lid)
 }

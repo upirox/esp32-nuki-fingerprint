@@ -8,11 +8,13 @@
 //         SEPARATE BAY with its own cover (opening the enclosure to work
 //         on the board never exposes live parts).
 //  It is screwed to the wall indoors, next to the 503 box of a wall socket:
-//  - signal cables to the outdoor plate leave through a rectangular slot
-//    in the middle of the right wall, flush with the back, and go into the
-//    nearby 503 box (and on through the wall conduit) under a small trunking;
-//  - 230 V from the socket enters the bay through a cable gland in the
-//    bottom wall.
+//  all cables come in through ONE opening in the right wall, flush with
+//  the back, under a trunking from the nearby 503 box. A rib (the top wall
+//  of the 230 V bay, extended to the outside) splits the opening in two:
+//  - upper part: signal cables to the outdoor plate (main compartment);
+//  - lower part: 230 V sheathed cable, which runs in a closed channel next
+//    to the bay and enters it through a hole in the bay's right wall,
+//    held by a cable tie (strain relief).
 //  (Set use_back_hole = true for the old layout: box straight behind the
 //   plate, cables through a hole in the back split by the bay wall.)
 //
@@ -106,11 +108,13 @@ box_clear  = 0.5;    // gap between the light box walls and the rib
 box_wire_w = 7;      // notches at the ends of the light box for the strip wires
 box_wire_h = 3.5;
 
-/* [Signal cable slot (right wall, flush with the back)] */
-use_sig_slot = true;
-sig_slot_y   = 0;     // centre of the slot along the right wall (0 = middle)
-sig_slot_w   = 16;    // width (along the wall): fits a 15 x 10 trunking
-sig_slot_h   = 11;    // height from the wall surface
+/* [Cable opening (right wall, flush with the back), split by the bay wall] */
+use_side_open = true;
+sig_open_w   = 12;    // signal part, above the rib (along the wall)
+mains_open_w = 10;    // 230 V part, below the rib (cable up to ~8.5 mm)
+side_open_h  = 11;    // height from the wall surface
+// total = sig_open_w + psu_wall + mains_open_w = 24 mm: a 25 x 10 trunking
+// with a divider, or two small ones side by side
 
 /* [OLD layout: cable hole in the back, split by the 230 V bay wall] */
 use_back_hole = false;
@@ -146,7 +150,7 @@ mod_l      = 46;    // Mean Well IRM-10-5: 45.7 x 25.4 x 21.5 (other module: mea
 mod_w      = 25.5;
 mod_x      = -20;   // module centre
 mod_y      = -50;
-use_gland  = true;  // mains cable gland in the bottom wall of the bay
+use_gland  = false; // alternative: mains cable gland in the bottom wall of the bay
 gland_x    = 35;
 gland_d    = 16.2;  // M16 gland (cable 4.5-10 mm, e.g. 3G1.5); 12.6 for M12
 out_hole_d = 6;     // 5 V wires to the board (top wall of the bay)
@@ -236,10 +240,16 @@ module base() {
         for (sx = [-1,1], sy = [-1,1])
             translate([board_x + sx*board_hole_dx/2, board_y + sy*board_hole_dy/2, 1])
                 cylinder(d = standoff_pilot, h = base_h);
-        // signal cable slot: right wall, middle, open at the back
-        if (use_sig_slot)
-            translate([in_w/2 - 1, sig_slot_y - sig_slot_w/2, -0.1])
-                cube([wall + 2, sig_slot_w, sig_slot_h + 0.1]);
+        // side opening, open at the back: signals above the rib, 230 V below
+        if (use_side_open) {
+            translate([in_w/2 - 1, psu_y1, -0.1])
+                cube([wall + 2, sig_open_w, side_open_h + 0.1]);
+            translate([in_w/2 - 1, psu_y1 - psu_wall - mains_open_w, -0.1])
+                cube([wall + 2, mains_open_w, side_open_h + 0.1]);
+            // into the bay through its right wall
+            translate([psu_x1 - psu_wall - 0.1, psu_y1 - psu_wall - mains_open_w, floor_t])
+                cube([psu_wall + 0.2, mains_open_w, side_open_h]);
+        }
         // OLD: cable hole from the wall (the bay wall stays: it splits the hole in two)
         if (use_back_hole) difference() {
             translate([cable_x, cable_y, -0.1]) cylinder(d = cable_d, h = floor_t + 0.2);
@@ -343,6 +353,18 @@ module psu_bay() {
     translate([psu_x1 - psu_wall, psu_y0 - 0.5, 0]) cube([psu_wall, psu_y1 - psu_y0 + 0.5, psu_ztop]);
     translate([psu_x0, psu_y1 - psu_wall, 0]) cube([psu_x1 - psu_x0, psu_wall, psu_ztop]);
     translate([psu_x0, psu_y0 - 0.5, 0]) cube([psu_x1 - psu_x0, psu_wall + 0.5, psu_ztop]);
+    if (use_side_open) {
+        // rib: top wall of the bay extended to the outer wall, it closes the
+        // 230 V channel between the bay and the right wall of the enclosure
+        translate([psu_x1 - 0.5, psu_y1 - psu_wall, 0]) cube([in_w/2 - psu_x1 + 1, psu_wall, psu_ztop]);
+        // cable tie block inside the bay: the tie goes through the tunnel
+        // and clamps the 230 V cable (strain relief)
+        translate([psu_x1 - psu_wall - 10, psu_y1 - psu_wall - mains_open_w - 1, floor_t - 0.5])
+        difference() {
+            cube([7, mains_open_w + 1 - 0.5, 4]);
+            translate([1.25, -0.1, 1.3]) cube([4.5, mains_open_w + 1, 1.8]);
+        }
+    }
     // posts for the cover screws
     for (p = psu_posts) translate([p[0], p[1], 0]) cylinder(d = psu_post_d, h = psu_ztop);
     // module cradle: 4 mm rims (fix it with a drop of hot glue)

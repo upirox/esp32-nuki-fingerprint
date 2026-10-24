@@ -154,7 +154,7 @@ mod_l      = 46;    // Mean Well IRM-10-5: 45.7 x 25.4 x 21.5 (other module: mea
 mod_w      = 25.5;
 mod_x      = -20;   // module centre
 mod_y      = -50;
-// Power supply board (perfboard 80 x 40, cut from a 70 x 90 one) instead of
+// Power supply board (perfboard 80 x 40, 2 mm holes at 76 x 36) instead of
 // the cradle: IRM-10-5 + input screw terminal, fuse holder, varistor,
 // output capacitors and output screw terminal, all soldered on the board.
 use_psu_board = true;  // false = bare module glued in the cradle
@@ -162,8 +162,10 @@ pcb_l      = 80;
 pcb_w      = 40;
 pcb_x      = -5;     // board centre: input end on the right (230 V entry),
 pcb_y      = -49.75; // output end on the left (5 V hole to the ESP32)
-pcb_hole_in= 3.5;    // M3 holes 3.5 mm from each corner (drill them if needed)
-pcb_post_h = 8;      // board height above the floor (heat-set M3 inserts)
+pcb_hole_in= 2;      // hole centres 2 mm from the edges: 76 x 36 spacing
+pcb_pilot_d= 1.7;    // 2 mm board holes: M2 self-tapping screws (M2 x 6-8)
+pcb_post_d = 6;
+pcb_post_h = 8;      // board height above the floor
 use_gland  = false; // alternative: mains cable gland in the bottom wall of the bay
 gland_x    = 35;
 gland_d    = 16.2;  // M16 gland (cable 4.5-10 mm, e.g. 3G1.5); 12.6 for M12
@@ -292,7 +294,7 @@ module base() {
         // holes of the 230 V cover posts
         for (p = psu_posts) screw_hole_in(p, psu_ztop);
         // holes of the supply board posts
-        if (use_psu_board) for (p = pcb_posts) screw_hole_in(p, floor_t + pcb_post_h);
+        if (use_psu_board) for (p = pcb_posts) translate([p[0], p[1], floor_t + 1]) cylinder(d = pcb_pilot_d, h = pcb_post_h);
         // 5 V wires from the bay to the board (top wall of the bay)
         translate([out_hole_x, psu_y1 + 1, floor_t + 6])
             rotate([90, 0, 0]) cylinder(d = out_hole_d, h = psu_wall + 2);
@@ -392,7 +394,7 @@ module psu_bay() {
     for (p = psu_posts) translate([p[0], p[1], 0]) cylinder(d = psu_post_d, h = psu_ztop);
     // supply board posts (holes cut in base())
     if (use_psu_board)
-        for (p = pcb_posts) translate([p[0], p[1], 0]) cylinder(d = psu_post_d, h = floor_t + pcb_post_h);
+        for (p = pcb_posts) translate([p[0], p[1], 0]) cylinder(d = pcb_post_d, h = floor_t + pcb_post_h);
     // module cradle: 4 mm rims (fix it with a drop of hot glue)
     if (!use_psu_board) translate([mod_x, mod_y, floor_t])
     difference() {

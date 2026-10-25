@@ -2,9 +2,9 @@
 #  ESP32 (38 pin) + R503 fingerprint reader + SSD1306 OLED -> Nuki via BLE
 #  Unlocking happens locally on the ESP32: it keeps working even when
 #  Home Assistant or the Wi-Fi are down.
-#  TESTED WORKING WITH ESPHOME 2026.9.1 - BUILD ISSUE WITH 2026.10.1
-#  (libsodium conflict with the nuki_lock component)
-#
+#  TESTED WORKING WITH ESPHOME 2026.9.1 - BUILD ISSUE WITH 2026.10.0
+#  (libsodium conflict with the nuki_lock component) - SOLVED WITH A FIX NOT MERGED YET.
+#  THIS VERSION IS USING THE FIXED VERSION at   - source: github://uriyacovy/ESPHome_nuki_lock@monorepo-test
 #  Wiring:
 #   R503  red VCC     -> 3V3      OLED 7 pin (SPI)
 #         white 3.3VT -> 3V3        GND      -> GND

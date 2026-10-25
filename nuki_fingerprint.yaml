@@ -191,7 +191,9 @@ api:
 
 # ---------------- Nuki (BLE) ----------------
 external_components:
-  - source: github://uriyacovy/ESPHome_nuki_lock
+#  - source: github://uriyacovy/ESPHome_nuki_lock
+#  test fix ESPHOME 2026.10.0 - rollback when merged
+  - source: github://uriyacovy/ESPHome_nuki_lock@monorepo-test
 
 lock:
   - platform: nuki_lock

@@ -40,7 +40,7 @@
 //
 //  LAYOUT (vertical, outer width < 15 cm):
 //    top      LED status strip (12 LEDs, 83 mm) inside a light box
-//    middle   ESP32 board on the left, ABOVE the 3 x 18650 battery pack
+//    middle   ESP32 board (upright) on the left, ABOVE the 3 x 18650 pack (lying)
 //             (tall standoffs) | PowerBoost 1000C and buzzer on the right
 //    bottom   230 V bay with the power supply (gland in the bottom wall)
 //
@@ -54,7 +54,7 @@ part = "all";            // "base", "lid", "lid230", "diffuser", "all"
 
 /* [Enclosure] */
 in_w     = 140;   // inner width (outer = +4.8 mm: max 150)
-in_h     = 150;   // inner height
+in_h     = 160;   // inner height (the terminal board stands upright)
 board_headroom = 20;  // room above the terminal board (ESP32 + terminals + wires)
                       // computed inner depth: pack + 4 + board + this
 wall     = 2.4;   // wall thickness
@@ -76,12 +76,12 @@ lid_head_d   = 6.5;   // countersink for the screw head
 lid_head_h   = 1.8;
 
 /* [ESP32 screw terminal board (position = board centre)] */
-board_x       = -27;
-board_y       = 17;
-board_w       = 80;   // board + terminals footprint
-board_h       = 65;
-board_hole_dx = 72;   // mounting hole spacing (MEASURE IT)
-board_hole_dy = 55;
+board_x       = -22;
+board_y       = 16.5;
+board_w       = 63;   // board + terminals footprint, upright: terminals on the
+board_h       = 78;   // left and right sides, wires go sideways, USB at the bottom
+board_hole_dx = 57;   // mounting hole spacing (MEASURE IT), 3 mm holes
+board_hole_dy = 72;
 standoff_d    = 8;
 standoff_air  = 4;    // air gap between battery pack and board (the pack sits under the board)
 standoff_pilot= 2.5;  // M3 self-tapping or M2.5 screw
@@ -99,7 +99,7 @@ sound_hole_d  = 1.6;
 led_n      = 12;
 led_pitch  = 1000/144; // 144 LEDs/m = 6.94 mm (8 LEDs/80 mm strip: 10) | length = led_n x led_pitch
 strip_w    = 12.6;   // strip width (12 mm PCB) + clearance
-strip_y    = 62;     // strip position (centre, at the top)
+strip_y    = 68;     // strip position (centre, at the top)
 led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window
 diff_type  = "pmma"; // "pmma": opal acrylic bar inside the light box, against the lid
@@ -129,8 +129,9 @@ cable_x  = 40;
 cable_d  = 32;
 
 /* [Backup battery: 3 x 18650 pack in parallel (MEASURE IT)] */
-pack_l     = 68;    // long side of the pack (cell length + wrap), vertical
-pack_w     = 58;    // short side (3 cells side by side), horizontal
+pack_l     = 68;    // long side of the pack (cell length + wrap)
+pack_w     = 58;    // short side (3 cells side by side)
+pack_horizontal = true; // long side horizontal: clears the board standoffs (57 x 72)
 pack_t     = 19.5;  // thickness: sets the depth of the enclosure
 pack_x     = board_x;  // under the board
 pack_y     = board_y;
@@ -161,7 +162,7 @@ use_psu_board = true;  // false = bare module glued in the cradle
 pcb_l      = 80;
 pcb_w      = 40;
 pcb_x      = -5;     // board centre: input end on the right (230 V entry),
-pcb_y      = -49.75; // output end on the left (5 V hole to the ESP32)
+pcb_y      = (-in_h/2 + 2.5 + psu_y1 - 2)/2; // centred in the bay; output end on the left (5 V hole)
 pcb_hole_in= 2;      // hole centres 2 mm from the edges: 76 x 36 spacing
 pcb_pilot_d= 1.7;    // 2 mm board holes: M2 self-tapping screws (M2 x 6-8)
 pcb_post_d = 6;
@@ -179,7 +180,7 @@ ant_d    = 6.6;    // panel-mount SMA / RP-SMA connector
 /* [Wall mounting (holes in the back)] */
 // [-27,17] is under the battery pack and the board:
 // screw the enclosure to the wall BEFORE fitting them
-wall_holes   = [[-50,60],[55,52],[58,-8],[-27,17]];
+wall_holes   = [[-56,66],[55,52],[58,-8],[-27,17]];
 wall_screw_d = 4.5;
 wall_head_d  = 8.5;
 
@@ -194,6 +195,8 @@ $fn = 64;
 
 // ------------------------------------------------------------
 standoff_h = pack_t + standoff_air;
+pack_dx = pack_horizontal ? pack_l : pack_w;   // pack footprint along x / y
+pack_dy = pack_horizontal ? pack_w : pack_l;
 in_d  = standoff_h + 1.6 + board_headroom;   // inner depth
 out_w = in_w + 2*wall;
 out_h = in_h + 2*wall;
@@ -280,7 +283,7 @@ module base() {
         }
         // slots for the battery pack strap
         for (sx = [-1,1])
-            translate([pack_x + sx*(pack_w/2 + 4.5), pack_y, -0.1])
+            translate([pack_x + sx*(pack_dx/2 + 4.5), pack_y, -0.1])
                 linear_extrude(floor_t + 0.2) offset(1) square([1.2, strap_w - 2], center = true);
         // wall screw holes (countersunk from the inside)
         for (p = wall_holes) translate([p[0], p[1], -0.1]) {
@@ -334,11 +337,11 @@ module led_rib() {
             cube([strip_len, 1.2, 1.2]);
 }
 
-// battery pack cradle (long side vertical), under the board.
+// battery pack cradle under the board (long side horizontal if pack_horizontal).
 // Opening for the wires on the PowerBoost side, notches for the strap.
 module pack_cradle() {
     c = 0.6; t = 1.6;
-    X = pack_w + 2*c; Y = pack_l + 2*c;     // cradle inside
+    X = pack_dx + 2*c; Y = pack_dy + 2*c;   // cradle inside
     translate([pack_x, pack_y, floor_t])
     difference() {
         translate([-X/2 - t, -Y/2 - t, 0]) cube([X + 2*t, Y + 2*t, pack_wall_h]);

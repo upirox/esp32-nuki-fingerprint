@@ -40,7 +40,7 @@
 //
 //  LAYOUT (vertical, outer width < 15 cm):
 //    top      LED status strip (12 LEDs, 83 mm) inside a light box
-//    middle   ESP32 board (upright) on the left, ABOVE the 3 x 18650 pack (lying)
+//    middle   ESP32 board on the left (USB-C to the right), ABOVE the 3 x 18650 pack
 //             (tall standoffs) | PowerBoost 1000C and buzzer on the right
 //    bottom   230 V bay with the power supply (gland in the bottom wall)
 //
@@ -54,7 +54,7 @@ part = "all";            // "base", "lid", "lid230", "diffuser", "all"
 
 /* [Enclosure] */
 in_w     = 140;   // inner width (outer = +4.8 mm: max 150)
-in_h     = 160;   // inner height (the terminal board stands upright)
+in_h     = 160;   // inner height (room for the wires above and below the board)
 board_headroom = 20;  // room above the terminal board (ESP32 + terminals + wires)
                       // computed inner depth: pack + 4 + board + this
 wall     = 2.4;   // wall thickness
@@ -76,12 +76,12 @@ lid_head_d   = 6.5;   // countersink for the screw head
 lid_head_h   = 1.8;
 
 /* [ESP32 screw terminal board (position = board centre)] */
-board_x       = -22;
-board_y       = 16.5;
-board_w       = 63;   // board + terminals footprint, upright: terminals on the
-board_h       = 78;   // left and right sides, wires go sideways, USB at the bottom
-board_hole_dx = 57;   // mounting hole spacing (MEASURE IT), 3 mm holes
-board_hole_dy = 72;
+board_x       = -26;
+board_y       = 17;
+board_w       = 78;   // board + terminals footprint, lying: terminals on the top and
+board_h       = 63;   // bottom sides, USB-C to the right (plug passes over the PowerBoost)
+board_hole_dx = 72;   // mounting hole spacing (MEASURE IT), 3 mm holes
+board_hole_dy = 57;
 standoff_d    = 8;
 standoff_air  = 4;    // air gap between battery pack and board (the pack sits under the board)
 standoff_pilot= 2.5;  // M3 self-tapping or M2.5 screw
@@ -131,7 +131,7 @@ cable_d  = 32;
 /* [Backup battery: 3 x 18650 pack in parallel (MEASURE IT)] */
 pack_l     = 68;    // long side of the pack (cell length + wrap)
 pack_w     = 58;    // short side (3 cells side by side)
-pack_horizontal = true; // long side horizontal: clears the board standoffs (57 x 72)
+pack_horizontal = false; // false: long side vertical, between the board standoffs (72 x 57)
 pack_t     = 19.5;  // thickness: sets the depth of the enclosure
 pack_x     = board_x;  // under the board
 pack_y     = board_y;

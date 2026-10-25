@@ -188,8 +188,14 @@ wall_head_d  = 8.5;
 vents      = true;
 vent_w     = 2;
 vent_l     = 14;
-vent_n     = 8;
-vent_y0    = -12;   // first vent slot (left and right walls: battery, board, PowerBoost)
+// Natural convection (chimney effect, enclosure on the wall): cool air comes in
+// through the LOW slots just above the 230 V bay, warm air leaves through the
+// HIGH slots near the top. Slots on the side walls (no dust falling in from above),
+// horizontal like louvres. The 230 V bay stays closed.
+vent_low_n  = 3;    // inlet slots on each side, starting just above the bay
+vent_high_n = 4;    // outlet slots on each side
+vent_high_y0= 44;   // first outlet slot (up to ~62)
+vent_pitch  = 6;
 
 $fn = 64;
 
@@ -304,9 +310,11 @@ module base() {
         // antenna (top wall)
         translate([ant_x, in_h/2 - 1, floor_t + in_d/2])
             rotate([-90, 0, 0]) cylinder(d = ant_d, h = wall + 2);
-        // vent slots (left and right walls, at board height)
-        if (vents) for (i = [0:vent_n-1], sx = [-1,1])
-            translate([sx*(in_w/2 + wall/2), vent_y0 + i*(vent_w + 4), floor_t + in_d/2])
+        // vent slots on the left and right walls: low inlets, high outlets
+        if (vents) for (sx = [-1,1], y = concat(
+                [for (i = [0:vent_low_n-1])  psu_y1 + 4 + i*vent_pitch],
+                [for (i = [0:vent_high_n-1]) vent_high_y0 + i*vent_pitch]))
+            translate([sx*(in_w/2 + wall/2), y, floor_t + in_d/2])
                 cube([wall + 2, vent_w, vent_l], center = true);
     }
 }

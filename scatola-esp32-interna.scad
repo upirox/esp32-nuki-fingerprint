@@ -95,10 +95,10 @@ buzz_ring_h   = 6;
 buzz_ring_w   = 1.2;
 sound_hole_d  = 1.6;
 
-/* [LED status strip (WS2812B 144 LEDs/m, 10 mm wide PCB)] */
+/* [LED status strip (WS2812B 144 LEDs/m, 12 mm wide PCB)] */
 led_n      = 12;
 led_pitch  = 1000/144; // 144 LEDs/m = 6.94 mm (8 LEDs/80 mm strip: 10) | length = led_n x led_pitch
-strip_w    = 10.6;   // strip width (10 mm PCB) + clearance
+strip_w    = 12.6;   // strip width (12 mm PCB) + clearance
 strip_y    = 62;     // strip position (centre, at the top)
 led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window

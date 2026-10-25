@@ -38,7 +38,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - SSD1306 0.96" OLED, 7-pin SPI version (**CS must be wired to a GPIO**, not tied to GND)
 - AM312 PIR (HW-740) with a **100 kΩ** pull-down (10 kΩ is too strong for its output)
 - 2 × passive buzzer modules ("low level trigger"), outdoor and indoor
-- WS2812B strip, 144 LEDs/m, 10 mm wide (e.g. BTF-LIGHTING ECO IP30), cut to 12 LEDs (330 Ω in series with DIN). The enclosure lid has a light box with a 2 mm opal (milk white) acrylic bar, about 84 × 13 mm, as diffuser (or a printed white one), so the LEDs show as one even bar instead of separate dots. For a 60 LEDs/m strip or an 8-LED stick change `led_n`/`led_pitch` in the enclosure and `num_leds` in the firmware.
+- WS2812B strip, 144 LEDs/m, 12 mm wide PCB (e.g. BTF-LIGHTING ECO), cut to 12 LEDs (330 Ω in series with DIN). The enclosure lid has a light box with a 2 mm opal (milk white) acrylic bar, about 84 × 15 mm, as diffuser (or a printed white one), so the LEDs show as one even bar instead of separate dots. For a 60 LEDs/m strip or an 8-LED stick change `led_n`/`led_pitch` in the enclosure and `num_leds` in the firmware.
 - 19 mm vandal-proof push button with 3–6 V LED ring
 - Subminiature lever microswitch (20 × 10.8 × 6.5 mm, steel lever, C/NO/NC contacts; use C + NO)
 - Reed switch + 6 × 2 mm magnet, wired in series with the microswitch

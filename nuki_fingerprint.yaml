@@ -134,6 +134,13 @@ esp32:
     type: esp-idf          # required by the nuki_lock component
 
 logger:
+  # The Nuki/BLE components are very chatty at DEBUG (advertising every second,
+  # every connection): keep them at INFO. Set them back to DEBUG to troubleshoot.
+  logs:
+    NukiBle: INFO
+    nuki_lock.lock: INFO
+    esp32_ble_client: INFO
+    esp32_ble_tracker: INFO
 
 # wifi, fallback hotspot, captive_portal, ota and diagnostics: from the base package
 api:

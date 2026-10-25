@@ -174,7 +174,7 @@ out_hole_d = 6;     // 5 V wires to the board (top wall of the bay)
 out_hole_x = -40;
 
 /* [Antenna (top wall)] */
-ant_x    = 55;
+ant_x    = -52;    // top wall, left: close to the ESP32 module (13 cm pigtail)
 ant_d    = 6.6;    // panel-mount SMA / RP-SMA connector
 
 /* [Wall mounting (holes in the back)] */

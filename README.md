@@ -28,6 +28,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The seat for the tamper microswitch is still to be added. |
 | `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure: ESP32 terminal board over the battery pack, PowerBoost, LED strip with light box and diffuser, indoor buzzer, separate 230 V bay. Mounted next to an indoor wall socket: all cables come in through one opening in the right wall, split by a rib into a signal part and a 230 V part that leads into the bay through a closed channel with a cable tie (no mains in the outdoor box). |
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
+| `coperchio-logo-anteprima.png` | Lid with the engraved chip + Wi-Fi logo (`logo_mode`: engrave and paint, or multi-material inlay with the `logo_chip` / `logo_wifi` parts). |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
 

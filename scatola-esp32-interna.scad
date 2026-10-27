@@ -29,6 +29,9 @@
 //               "printed": flat diffuser in a pocket on the inside of the lid.
 //               "pmma": nothing to print, cut an OPAL acrylic bar to
 //                 diff_pmma_l x diff_pmma_w (sits behind the window, recessed)
+//    "separator" insulating plate (board footprint) that slides over the 4
+//               board standoffs and rests on the battery pack: the solder
+//               joints under the board can never touch the pack
 //    "all"      assembled preview with the lid lifted
 //
 //  Screws: 4 x M3 x 8 in the lid and 2 x M3 x 6 in the 230 V cover,
@@ -99,7 +102,9 @@ board_h       = 63;   // bottom sides, USB-C to the right (plug passes over the 
 board_hole_dx = 72;   // mounting hole spacing (MEASURE IT), 3 mm holes
 board_hole_dy = 57;
 standoff_d    = 8;
-standoff_air  = 4;    // air gap between battery pack and board (the pack sits under the board)
+standoff_air  = 5;    // gap between battery pack and board: strap + separator + air
+use_separator = true; // insulating plate between the pack and the solder side of the board
+sep_t         = 1.2;  // separator thickness (PETG, 100% infill)
 standoff_pilot= 2.5;  // M3 self-tapping or M2.5 screw
 board_guides  = true; // L-shaped corner guides that centre the board
 
@@ -342,6 +347,18 @@ module base() {
 }
 
 // L-shaped guides at the board corners (they centre it, they don't clamp it)
+// insulating separator: board footprint (fits inside the corner guides), holes for
+// the standoffs, a few slots so warm air from the pack can still rise
+module separator() {
+    difference() {
+        translate([-(board_w - 0.6)/2, -(board_h - 0.6)/2, 0]) cube([board_w - 0.6, board_h - 0.6, sep_t]);
+        for (sx = [-1,1], sy = [-1,1])
+            translate([sx*board_hole_dx/2, sy*board_hole_dy/2, -0.1]) cylinder(d = standoff_d + 0.8, h = sep_t + 0.2);
+        for (i = [-2:2]) translate([i*10, 0, -0.1])
+            linear_extrude(sep_t + 0.2) offset(1) square([0.01, board_h/2], center = true);
+    }
+}
+
 module board_corner_guides() {
     g = 1.2; l = 8; h = floor_t + standoff_h + 3;
     for (sx = [-1,1], sy = [-1,1])
@@ -590,6 +607,7 @@ module diffuser() {
 if (part == "base") base();
 if (part == "lid") lid_print();
 if (part == "diffuser") diffuser();
+if (part == "separator") separator();
 if (part == "logo_chip" && logo_mode == "inlay") logo_part_print("chip");
 if (part == "logo_wifi" && logo_mode == "inlay") logo_part_print("wifi");
 echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm")
@@ -598,6 +616,8 @@ if (part == "lid230") psu_lid();
 if (part == "all") {
     base();
     color("OrangeRed") translate([psu_x0, psu_y0 + fit, psu_ztop + 8]) psu_lid();
+    if (use_separator)   // resting on the pack, under the board
+        color("Gold") translate([board_x, board_y, floor_t + pack_t + 1.5]) separator();
     color("SteelBlue", 0.6) translate([0, 0, 25]) lid_assembled();
     if (logo_mode != "none") translate([0, 0, 25 + base_h + lid_t - logo_depth]) {
         color("#0B3A82") logo_solid("chip", logo_depth);

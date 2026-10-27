@@ -22,10 +22,13 @@
 //    "base"     enclosure, printed with the back on the bed
 //    "lid"      printed with the visible face on the bed
 //    "lid230"   cover of the 230 V bay (2 M3 screws)
-//    "diffuser" strip for the LED window, only if diff_type = "printed":
-//               print it in WHITE PETG, 1.6 mm, 100% infill.
-//               With diff_type = "pmma" (default) buy an OPAL (milk white)
-//               acrylic bar instead, cut to diff_pmma_l x diff_pmma_w
+//    "diffuser" LED window diffuser, depends on diff_type:
+//               "plug" (default): printed plug, flush with the lid face.
+//                 Print it in WHITE PETG, front face on the bed, 100% infill;
+//                 push it into the window from inside, glue the flange.
+//               "printed": flat diffuser in a pocket on the inside of the lid.
+//               "pmma": nothing to print, cut an OPAL acrylic bar to
+//                 diff_pmma_l x diff_pmma_w (sits behind the window, recessed)
 //    "all"      assembled preview with the lid lifted
 //
 //  Screws: 4 x M3 x 8 in the lid and 2 x M3 x 6 in the 230 V cover,
@@ -115,8 +118,14 @@ strip_w    = 12.6;   // strip width (12 mm PCB) + clearance
 strip_y    = 68;     // strip position (centre, at the top)
 led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window
-diff_type  = "pmma"; // "pmma": opal acrylic bar inside the light box, against the lid
+diff_type  = "plug"; // "plug": printed plug flush with the lid face (white PETG)
+                     // "pmma": opal acrylic bar inside the light box, against the lid
                      // "printed": printed diffuser in a pocket in the lid
+plug_clear = 0.15;   // plug: gap per side in the window (tight: 0.1, loose: 0.2)
+plug_skin  = 0.8;    // plug: front skin = the diffuser (0.6 brighter, 1.0 more even)
+plug_wall  = 0.8;    // plug: side walls (hollow behind the skin)
+plug_flange= 2;      // plug: flange around the window, inside the light box
+plug_flange_t = 1.2; // plug: flange thickness (glued to the inside of the lid)
 diff_t     = 2;      // diffuser thickness: 2 mm opal PMMA (printed: 1.6)
 diff_margin= 2;      // diffuser ledge around the window
 use_lightbox = true; // walls around the strip, hanging from the lid
@@ -555,8 +564,22 @@ module lid_print() {
 }
 
 // ---------------- DIFFUSER ----------------
+module win_slot(r) { offset(r) square([win_w - win_h, 0.02], center = true); }
+// plug, front face at z = 0 (as printed); in the lid the front is flush with the face
+module window_plug() {
+    difference() {
+        union() {
+            linear_extrude(lid_t) win_slot(win_h/2 - plug_clear);
+            translate([0, 0, lid_t]) linear_extrude(plug_flange_t) win_slot(win_h/2 + plug_flange);
+        }
+        // hollow behind the skin: the light only crosses plug_skin of plastic
+        translate([0, 0, plug_skin]) linear_extrude(lid_t + plug_flange_t)
+            win_slot(win_h/2 - plug_clear - plug_wall);
+    }
+}
 module diffuser() {
-    if (diff_type == "printed")
+    if (diff_type == "plug") window_plug();
+    else if (diff_type == "printed")
         linear_extrude(diff_t - 0.15)
             offset(win_h/2 + diff_margin - 0.25) square([win_w - win_h, 0.02], center = true);
     else   // the acrylic bar (preview only)
@@ -569,7 +592,8 @@ if (part == "lid") lid_print();
 if (part == "diffuser") diffuser();
 if (part == "logo_chip" && logo_mode == "inlay") logo_part_print("chip");
 if (part == "logo_wifi" && logo_mode == "inlay") logo_part_print("wifi");
-echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm") : "printed, part = diffuser"));
+echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm")
+     : diff_type == "plug" ? "printed plug flush with the lid, part = diffuser (white PETG)" : "printed, part = diffuser"));
 if (part == "lid230") psu_lid();
 if (part == "all") {
     base();
@@ -579,6 +603,9 @@ if (part == "all") {
         color("#0B3A82") logo_solid("chip", logo_depth);
         color("#1F9BD7") logo_solid("wifi", logo_depth);
     }
-    color("White") translate([0, strip_y, base_h + 25 - 0.05]) mirror([0,0,1]) diffuser();
+    if (diff_type == "plug")   // in place: front flush with the lid face
+        color("White") translate([0, strip_y, 25 + base_h + lid_t]) mirror([0,0,1]) window_plug();
+    else
+        color("White") translate([0, strip_y, base_h + 25 - 0.05]) mirror([0,0,1]) diffuser();
     // (pmma: the bar lies inside the light box, against the lid)
 }

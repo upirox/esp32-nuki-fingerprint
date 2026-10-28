@@ -30,6 +30,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
 | `coperchio-logo-anteprima.png` | Lid with the engraved chip + Wi-Fi logo (`logo_mode`: engrave and paint, or multi-material inlay with the `logo_chip` / `logo_wifi` parts). |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
+| `plate-connector-rj45.png` | Wiring of the two RJ45 connectors between the outdoor plate and the ESP32. |
 | `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
 
 ## Hardware
@@ -57,6 +58,8 @@ Both contacts are closed while the plate is screwed on, so GPIO19 reads LOW. If 
 ### Plate connector (2 × RJ45)
 
 The plate can be unplugged: two RJ45 breakout boards (RJ45 jack + 8 screw terminals) are screwed to the back of the plate, and two Cat5e/Cat6 cables from the ESP32, crimped with **T568B** plugs, plug into them. Use the same table at the ESP32 end (another pair of breakouts, or the bare wires into the terminal board). Label the cables and the jacks **A** and **B**: swapping them connects outputs to outputs.
+
+![Plate connector wiring](plate-connector-rj45.png)
 
 | Pin | T568B colour | Cable A (display, power) | Cable B (reader, sensors) |
 |---|---|---|---|

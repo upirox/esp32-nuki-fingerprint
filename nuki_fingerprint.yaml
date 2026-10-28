@@ -38,18 +38,24 @@
 #         During a blackout: strip at 30%, push button ring off while idle
 #         and at 60% when the display turns on.
 #
-#  Fingerprint sensor ring (while the display is on):
-#    blue = locked / unknown, yellow = unlocked or open (aura_unlocked_color)
-#
-#  LED strip:
-#    dim green, steady  = door locked
-#    red, steady        = door unlocked / open
-#    yellow, pulsing    = lock moving (opening/closing)
+#  Colour code
+#  INDOOR (LED strip, for whoever is at home):
+#    green, dim         = door locked (all good)
+#    red, steady        = door unlocked / open (attention)
+#    yellow, pulsing    = lock moving (locking, unlocking, opening)
+#    red, fast blink    = fingerprint not recognised (1.5 s)
+#    red, slow blink    = ALARM: reader locked out (3 wrong fingerprints)
+#                         or plate tamper, until it is cleared
 #    purple, pulsing    = lock jammed
-#    dim blue           = Nuki unreachable / unknown state
-#    red, blinking      = fingerprint not recognised
-#    red, pulsing       = ALARM, reader locked out
+#    blue, dim          = Nuki unreachable / unknown state
 #    blue, scanning     = fingerprint enrollment in progress
+#  OUTDOOR (fingerprint sensor ring, lit together with the display):
+#    blue               = someone approaching, door locked; enrollment
+#    green, steady      = someone approaching, door already unlocked
+#    green, breathing   = fingerprint accepted
+#    red, short flashes = fingerprint not recognised
+#    red, blinking      = reader blocked: lockout, tamper or disabled from HA
+#  The display never shows the lock state (it faces the street).
 #
 #  Home Assistant entities, actions and event texts are in English.
 #  The messages shown on the OLED display are in Italian: they are plain
@@ -83,7 +89,7 @@ substitutions:
   # Ring colour while the display is on and the lock is UNLOCKED or open.
   # The display no longer shows the lock state (it faces the street): only
   # whoever knows the colour code can tell the door is not locked.
-  aura_unlocked_color: YELLOW
+  aura_unlocked_color: GREEN
   # Doorbell (INDOOR only): double ding-dong. Octave 7 (2-2.6 kHz) is where
   # passive buzzers resonate and sound loudest.
   tone_bell: "bell:d=4,o=7,b=100:e,2c,4p,e,2c"
@@ -251,6 +257,19 @@ light:
     default_transition_length: 200ms
     restore_mode: ALWAYS_OFF
     effects:
+      # latched alarms (reader locked out, tamper): slow red blink
+      - strobe:
+          name: Alarm Blink
+          colors:
+            - state: true
+              brightness: 100%
+              red: 100%
+              green: 0%
+              blue: 0%
+              duration: 500ms
+            - state: false
+              duration: 500ms
+      # single wrong fingerprint: fast red blink for 1.5 s
       - strobe:
           name: Red Blink
           colors:
@@ -407,6 +426,7 @@ script:
       - globals.set: { id: tamper_latched, value: "true" }
       - switch.turn_on: sw_reader_off
       - script.execute: aura_idle
+      - script.execute: restore_strip            # indoor strip: red blinking
       - script.execute: screen_wake
       - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
@@ -418,7 +438,7 @@ script:
           format: "Tamper detected: reader locked until reset from HA"
 
   # Idle state of the sensor ring:
-  #   alarm -> steady red | reader disabled -> blinking red
+  #   alarm (3 wrong fingerprints) or reader disabled (tamper / HA) -> blinking red
   #   display on -> steady aura_presence_color, or aura_unlocked_color if the
   #   lock is unlocked/open (same duration as the display) | otherwise off
   - id: aura_idle
@@ -429,10 +449,10 @@ script:
             lambda: "return id(locked_out);"
           then:
             - fingerprint_grow.aura_led_control:
-                state: ALWAYS_ON
-                speed: 0
+                state: FLASHING
+                speed: 100
                 color: RED
-                count: 0
+                count: 0          # 0 = forever
           else:
             - if:
                 condition:
@@ -535,19 +555,20 @@ script:
           auto call = id(strip).turn_on();
           float r = 0, g = 0, b = 0, br = 0.6f;
           std::string fx = "None";
-          if (id(locked_out)) {
-            r = 1; br = 1.0f; fx = "Pulse";               // alarm
+          bool alarm = id(locked_out) || id(tamper_latched);
+          if (alarm) {
+            r = 1; br = 1.0f; fx = "Alarm Blink";         // reader locked out or tamper
           } else {
             switch (id(nuki).state) {
               case lock::LOCK_STATE_LOCKED:
                 g = 1; br = 0.25f; break;                      // locked: dim green (all good)
               case lock::LOCK_STATE_UNLOCKED:
               case lock::LOCK_STATE_OPEN:
-              case lock::LOCK_STATE_OPENING:
                 r = 1; break;                                  // unlocked: red (attention)
               case lock::LOCK_STATE_LOCKING:
               case lock::LOCK_STATE_UNLOCKING:
-                r = 1; g = 0.7f; fx = "Pulse"; break;     // moving
+              case lock::LOCK_STATE_OPENING:
+                r = 1; g = 0.7f; fx = "Pulse"; break;     // moving: yellow
               case lock::LOCK_STATE_JAMMED:
                 r = 0.7f; b = 1; fx = "Pulse"; break;     // jammed
               default:
@@ -555,7 +576,7 @@ script:
             }
           }
           // on battery: strip at 30% (the alarm stays at full brightness)
-          if (!id(mains_ok).state && !id(locked_out)) br *= 0.3f;
+          if (!id(mains_ok).state && !alarm) br *= 0.3f;
           call.set_rgb(r, g, b);
           call.set_brightness(br);
           call.set_effect(fx);
@@ -596,9 +617,9 @@ script:
       - script.stop: flash_error
       - script.execute: restore_strip
       - script.execute: screen_wake
-      - fingerprint_grow.aura_led_control:   # sensor ring steady red
-          state: ALWAYS_ON
-          speed: 0
+      - fingerprint_grow.aura_led_control:   # sensor ring blinking red
+          state: FLASHING
+          speed: 100
           color: RED
           count: 0
       - component.update: oled
@@ -1136,6 +1157,7 @@ button:
             - globals.set: { id: tamper_latched, value: "false" }
             - switch.turn_off: sw_reader_off
             - script.execute: aura_idle
+            - script.execute: restore_strip
             - script.execute: screen_wake
             - text_sensor.template.publish:
                 id: last_event

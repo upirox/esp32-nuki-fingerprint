@@ -38,6 +38,9 @@
 #         During a blackout: strip at 30%, push button ring off while idle
 #         and at 60% when the display turns on.
 #
+#  Fingerprint sensor ring (while the display is on):
+#    blue = locked / unknown, yellow = unlocked or open (aura_unlocked_color)
+#
 #  LED strip:
 #    dim green, steady  = door locked
 #    red, steady        = door unlocked / open
@@ -77,6 +80,10 @@ substitutions:
   # The R503 only has fixed colours: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
   # WHITE looks warm; CYAN is the cooler alternative (bluish white).
   aura_presence_color: BLUE
+  # Ring colour while the display is on and the lock is UNLOCKED or open.
+  # The display no longer shows the lock state (it faces the street): only
+  # whoever knows the colour code can tell the door is not locked.
+  aura_unlocked_color: YELLOW
   # Doorbell (INDOOR only): double ding-dong. Octave 7 (2-2.6 kHz) is where
   # passive buzzers resonate and sound loudest.
   tone_bell: "bell:d=4,o=7,b=100:e,2c,4p,e,2c"
@@ -310,6 +317,10 @@ interval:
             last = s;
             if (!id(fp_enrolling).state) id(restore_strip).execute();
             id(screen_wake).execute();       // every state change wakes the display
+            // display already on: update the ring colour (locked / unlocked),
+            // unless a message with its own flash is still running
+            if (id(screen_on) && !id(show_msg).is_running() && !id(fp_enrolling).state)
+              id(aura_idle).execute();
           }
 
 # ---------------- Buzzers ----------------
@@ -408,7 +419,8 @@ script:
 
   # Idle state of the sensor ring:
   #   alarm -> steady red | reader disabled -> blinking red
-  #   display on -> steady aura_presence_color (same duration) | otherwise off
+  #   display on -> steady aura_presence_color, or aura_unlocked_color if the
+  #   lock is unlocked/open (same duration as the display) | otherwise off
   - id: aura_idle
     mode: restart
     then:
@@ -438,11 +450,23 @@ script:
                         # steady ring, invites the user to place a finger
                         lambda: "return id(screen_on) && !id(fp_enrolling).state;"
                       then:
-                        - fingerprint_grow.aura_led_control:
-                            state: ALWAYS_ON
-                            speed: 0
-                            color: ${aura_presence_color}
-                            count: 0
+                        - if:
+                            condition:
+                              lambda: |-
+                                return id(nuki).state == lock::LOCK_STATE_UNLOCKED ||
+                                       id(nuki).state == lock::LOCK_STATE_OPEN;
+                            then:   # door not locked: dedicated colour
+                              - fingerprint_grow.aura_led_control:
+                                  state: ALWAYS_ON
+                                  speed: 0
+                                  color: ${aura_unlocked_color}
+                                  count: 0
+                            else:
+                              - fingerprint_grow.aura_led_control:
+                                  state: ALWAYS_ON
+                                  speed: 0
+                                  color: ${aura_presence_color}
+                                  count: 0
                       else:
                         - fingerprint_grow.aura_led_control:
                             state: ALWAYS_OFF
@@ -705,37 +729,15 @@ display:
         it.print(64, 18, id(font_big), TextAlign::CENTER, id(msg1).c_str());
         it.print(64, 38, id(font_small), TextAlign::CENTER, id(msg2).c_str());
       } else {
-        // idle message matching the lock state:
-        // "place your finger" only when a fingerprint is actually needed
-        const char *a = "Appoggia il dito", *b = "sul lettore";
-        switch (id(nuki).state) {
-          case lock::LOCK_STATE_UNLOCKING:
-          case lock::LOCK_STATE_OPENING:
-            a = "Apertura..."; b = "attendi un istante"; break;
-          case lock::LOCK_STATE_UNLOCKED:
-          case lock::LOCK_STATE_OPEN:
-            a = "Porta aperta"; b = "puoi entrare"; break;
-          case lock::LOCK_STATE_LOCKING:
-            a = "Chiusura..."; b = "attendi un istante"; break;
-          case lock::LOCK_STATE_JAMMED:
-            a = "Inceppata"; b = "usa la chiave"; break;
-          default: break;   // locked or unknown state: a fingerprint is needed
-        }
-        it.print(64, 18, id(font_big), TextAlign::CENTER, a);
-        it.print(64, 38, id(font_small), TextAlign::CENTER, b);
+        // idle message: the same whatever the lock state, so the display
+        // (facing the street) never tells whether the door is locked.
+        // The lock state is shown by the sensor ring colour (aura_idle).
+        it.print(64, 18, id(font_big), TextAlign::CENTER, "Appoggia il dito");
+        it.print(64, 38, id(font_small), TextAlign::CENTER, "sul lettore");
       }
-      // Bottom status line: lock state
-      const char *st = "Nuki: ?";
-      switch (id(nuki).state) {
-        case lock::LOCK_STATE_LOCKED:    st = "Porta chiusa"; break;
-        case lock::LOCK_STATE_UNLOCKED:  st = "Porta sbloccata"; break;
-        case lock::LOCK_STATE_LOCKING:   st = "Chiusura..."; break;
-        case lock::LOCK_STATE_UNLOCKING: st = "Apertura..."; break;
-        case lock::LOCK_STATE_JAMMED:    st = "Serratura bloccata"; break;
-        default: break;
-      }
+      // Bottom line
       it.line(0, 52, 127, 52);
-      it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, st);
+      it.print(64, 63, id(font_small), TextAlign::BOTTOM_CENTER, "Accesso riservato");
 
 # ---------------- Fingerprint reader ----------------
 uart:

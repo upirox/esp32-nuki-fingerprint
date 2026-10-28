@@ -12,7 +12,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 - **Fingerprint unlock** (R503 reader) with a configurable confidence threshold and sensor password protection against swapping the sensor.
 - **Alarm after 3 wrong fingerprints**: reader locked for 15 minutes, siren, Home Assistant entities for notifications. The lockout survives reboots and power cuts.
 - **Tamper detection**: a lever microswitch and a reed switch **in series** behind the outdoor plate. Removing the plate (or cutting the cable) opens the circuit, disables the reader until it is reset from Home Assistant and sounds the siren. The microswitch is pressed mechanically by the wall box, so it cannot be fooled with a magnet held outside the plate, which would keep a reed alone closed; the reed stays as a second, independent sensor.
-- **OLED display** woken by a PIR sensor, with messages that follow the lock state.
+- **OLED display** woken by a PIR sensor. It never shows whether the door is locked (it faces the street): the fingerprint sensor ring tells it instead, blue = locked, yellow = unlocked (colours set in `substitutions`).
 - **LED status strip** indoors: green = locked, red = unlocked, yellow = moving, purple = jammed, blue = Nuki unreachable.
 - **Doorbell** push button with LED ring; double ding-dong on an indoor buzzer, plus a Home Assistant `event` entity.
 - **Backup battery** (PowerBoost 1000C + Li-ion): mains/battery sensors, battery percentage and an automatic power saving mode during blackouts.

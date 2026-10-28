@@ -31,6 +31,7 @@ Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuk
 | `coperchio-logo-anteprima.png` | Lid with the engraved chip + Wi-Fi logo (`logo_mode`: engrave and paint, or multi-material inlay with the `logo_chip` / `logo_wifi` parts). |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `plate-connector-rj45.png` | Wiring of the two RJ45 connectors between the outdoor plate and the ESP32. |
+| `plate-power-strip.png` | 3V3 / GND distribution strip behind the outdoor plate. |
 | `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
 
 ## Hardware
@@ -72,7 +73,7 @@ The plate can be unplugged: two RJ45 breakout boards (RJ45 jack + 8 screw termin
 | 7 | white-brown | OLED RES → GPIO26 | PIR OUT → GPIO34 |
 | 8 | brown | outdoor buzzer I/O → GPIO25 | tamper loop → GPIO19 |
 
-Each fast or sensitive signal shares a twisted pair with GND (SCK, R503 TX). On the plate, 3V3 and GND go to a small distribution strip (a piece of perfboard with two rails): 3V3 feeds the R503 (VCC and 3.3VT), OLED, PIR and outdoor buzzer; GND goes to all of them plus the push button, the LED ring cathode and the end of the tamper loop. The PIR's 100 kΩ pull-down stays at the ESP32 end, between GPIO34 and GND. Mount the jacks facing down or sideways, so condensation can't collect in them.
+Each fast or sensitive signal shares a twisted pair with GND (SCK, R503 TX). On the plate, 3V3 and GND go to a small distribution strip (a piece of stripboard with two copper strips and 2.54 mm screw terminals, see `plate-power-strip.png`): 3V3 feeds the R503 (VCC and 3.3VT), OLED, PIR and outdoor buzzer; GND goes to all of them plus the push button, the LED ring cathode and the end of the tamper loop. The PIR's 100 kΩ pull-down stays at the ESP32 end, between GPIO34 and GND. Mount the jacks facing down or sideways, so condensation can't collect in them.
 
 ## Getting started
 

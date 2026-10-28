@@ -54,6 +54,23 @@ GPIO19 ──── microswitch C ──── microswitch NO ──── reed 
 
 Both contacts are closed while the plate is screwed on, so GPIO19 reads LOW. If either opens (plate removed, cable cut, microswitch released even with a magnet holding the reed) the input goes HIGH through the internal pull-up and the tamper alarm fires. The firmware sees a single contact, so no configuration change is needed when adding the microswitch.
 
+### Plate connector (2 × RJ45)
+
+The plate can be unplugged: two RJ45 breakout boards (RJ45 jack + 8 screw terminals) are screwed to the back of the plate, and two Cat5e/Cat6 cables from the ESP32, crimped with **T568B** plugs, plug into them. Use the same table at the ESP32 end (another pair of breakouts, or the bare wires into the terminal board). Label the cables and the jacks **A** and **B**: swapping them connects outputs to outputs.
+
+| Pin | T568B colour | Cable A (display, power) | Cable B (reader, sensors) |
+|---|---|---|---|
+| 1 | white-orange | GND | GND |
+| 2 | orange | OLED D0 / SCK → GPIO18 | R503 TX (yellow) → GPIO16 |
+| 3 | white-green | 3V3 | R503 RX (purple) → GPIO17 |
+| 4 | blue | OLED CS → GPIO5 | doorbell button → GPIO33 |
+| 5 | white-blue | OLED DC → GPIO27 | button LED ring + → GPIO32 |
+| 6 | green | OLED D1 / MOSI → GPIO23 | R503 WAKEUP (blue) → GPIO4 |
+| 7 | white-brown | OLED RES → GPIO26 | PIR OUT → GPIO34 |
+| 8 | brown | outdoor buzzer I/O → GPIO25 | tamper loop → GPIO19 |
+
+Each fast or sensitive signal shares a twisted pair with GND (SCK, R503 TX). On the plate, 3V3 and GND go to a small distribution strip (a piece of perfboard with two rails): 3V3 feeds the R503 (VCC and 3.3VT), OLED, PIR and outdoor buzzer; GND goes to all of them plus the push button, the LED ring cathode and the end of the tamper loop. The PIR's 100 kΩ pull-down stays at the ESP32 end, between GPIO34 and GND. Mount the jacks facing down or sideways, so condensation can't collect in them.
+
 ## Getting started
 
 1. Copy `nuki_fingerprint.yaml` and the `common/` folder into your ESPHome config folder.

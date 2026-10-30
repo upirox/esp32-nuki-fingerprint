@@ -2,9 +2,9 @@
 
 ESPHome firmware and 3D-printable enclosures for an ESP32 that drives a **Nuki Smart Lock locally over Bluetooth**, with a **fingerprint reader**, OLED display, doorbell and tamper detection at the front door. Unlocking happens on the ESP32 itself, so it keeps working when Home Assistant or the Wi-Fi are down.
 
-Tested with **ESPHome 2026.9.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuki Smart Lock 3.0**.
+Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nuki Smart Lock 3.0**.
 
-> **ESPHome 2026.10.x does not build yet**: ESPHome's new `esphome/libsodium` (used by API encryption) clashes with the `espressif/libsodium` pulled in by the [`nuki_lock`](https://github.com/uriyacovy/ESPHome_nuki_lock) component (`esphome__libsodium and espressif__libsodium are both added as project_managed_components`). Stay on 2026.9.x until the component is updated.
+> **ESPHome version**: the current [`nuki_lock`](https://github.com/uriyacovy/ESPHome_nuki_lock) component uses ESPHome's own BLE stack and needs **ESPHome 2026.10 or later** (older component releases failed to build on 2026.10 because of a libsodium conflict). Upgrading from an older component release keeps the pairing: it is migrated automatically on the first boot.
 
 ## Features
 

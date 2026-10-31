@@ -147,13 +147,25 @@ esp32:
     type: esp-idf          # required by the nuki_lock component
 
 logger:
-  # The Nuki/BLE components are very chatty at DEBUG (advertising every second,
-  # every connection): keep them at INFO. Set them back to DEBUG to troubleshoot.
+  # TEST: verbose for the Nuki/BLE components, the rest kept quiet
+  level: VERBOSE
   logs:
-    NukiBle: INFO
-    nuki_lock.lock: INFO
-    esp32_ble_client: INFO
-    esp32_ble_tracker: INFO
+    NukiBle: VERBOSE
+    nuki_lock.lock: VERBOSE
+    esp32_ble_client: VERBOSE
+    esp32_ble_tracker: DEBUG
+    esp-idf: DEBUG
+    sensor: INFO
+    binary_sensor: INFO
+    text_sensor: INFO
+    light: INFO
+    script: INFO
+    fingerprint_grow: INFO
+    adc: INFO
+    api: INFO
+    wifi: INFO
+    component: INFO
+    preferences: INFO
 
 # wifi, fallback hotspot, captive_portal, ota and diagnostics: from the base package
 api:
@@ -204,7 +216,10 @@ api:
 
 # ---------------- Nuki (BLE) ----------------
 external_components:
-  - source: github://uriyacovy/ESPHome_nuki_lock
+  # TEST BRANCH: fix for the state lag after lock actions (issue with juka).
+  # Go back to main (github://uriyacovy/ESPHome_nuki_lock) when it is merged.
+  - source: github://uriyacovy/ESPHome_nuki_lock@fixes-311026
+    refresh: 0s      # always fetch the latest commit of the test branch
 
 lock:
   - platform: nuki_lock
@@ -217,6 +232,11 @@ lock:
     # To use it, add  nuki_pin: "1234"  to secrets.yaml and remove the #
     # security_pin: !secret nuki_pin
     event: "none"
+    # TEST: protocol debug for the issue (only on the fixes-311026 branch)
+    debug:
+      connect: true
+      communication: true
+      command: true
     # --- Pairing and connection state ---
     pairing_mode:                 # switch in HA to start pairing
       name: Nuki Pairing Mode

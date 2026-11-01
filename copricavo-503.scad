@@ -55,7 +55,10 @@ div_t    = 2;      // divider thickness (= the rib of the box)
 div_y    = -2;     // divider bottom edge (y): 230 V below, signals above
 flange_w = 5;      // wall flanges for the tape (each side, in the gap)
 cap_clr  = 0.3;    // cap clearance in the window
-mod_w    = win_w/3;
+cap_mods = 1;      // modules covered by the cap: 1 (pre-drilled blank only)
+                   // or 2 (also the plain blank next to it: more room inside)
+mod_w    = win_w/3; // window modules, from the left: pre-drilled blank,
+                    // blank, Italian socket
 
 /* [Box (for the preview only)] */
 box_out_w = 144.8;
@@ -72,7 +75,7 @@ pb = (t_10 - t_edge) / 10 - pa * 10;
 function pz(x) = x < 0 ? 0 : x <= bord_w ? t_edge + pb*x + pa*x*x : t_max;
 
 cap_x0 = bord_w + cap_clr;
-cap_x1 = bord_w + mod_w - cap_clr;
+cap_x1 = bord_w + cap_mods*mod_w - cap_clr;
 cap_h  = win_h - 2*cap_clr;
 hole_x = bord_w + mod_w/2;
 cap_zi = t_max + ch_clear;              // inside of the cap roof

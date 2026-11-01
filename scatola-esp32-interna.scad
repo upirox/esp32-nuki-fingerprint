@@ -186,7 +186,7 @@ lp_d        = 2;      // rod diameter (2 mm acrylic rod)
 lp_hole     = 2.1;    // hole in the lid: press fit
 lp_bore     = 2.25;   // bore of the tubes
 lp_wall     = 1;      // tube wall
-lp_led_gap  = 1;      // rod end to LED top
+lp_led_gap  = 0.5;    // rod end to LED top (small: less light reaches the next rod)
 // LED positions on the board (Adafruit Eagle file, Rev B), from the board's
 // corner at the micro-USB / pad-row side: [x, y, name]
 // 4th value: how much higher that tube/rod stops (LOW sits next to the 6 mm
@@ -609,7 +609,9 @@ module logo_part_print(which) {
 pb_x0 = pb_x - pb_l/2;                 // board corner on the micro-USB / pads side
 pb_y0 = pb_y - pb_w/2;
 lp_pos = [for (l = pb_leds) [pb_x0 + l[0], pb_y0 + l[1], l[3]]];
-lp_led_top = floor_t + 2 + 1.6 + 0.8;  // feet + PCB + 0805 LED
+lp_pcb_top = floor_t + 2 + 1.6;        // feet + PCB
+lp_led_top = lp_pcb_top + 0.8;         // + 0805 LED
+lp_div_t   = 0.8;                      // divider between DONE and CHRG
 lp_bot = lp_led_top + lp_led_gap;      // bottom of the tubes and of the rods
 lp_len = base_h + lid_t - lp_bot;      // rod length, flush with the lid face
 
@@ -619,6 +621,11 @@ module lp_tubes() {
     // DONE and CHRG are close: join their tubes with a web (stiffer, no gap)
     hull() for (i = [1, 2]) translate([lp_pos[i][0], lp_pos[i][1], lp_bot])
         cylinder(d = lp_bore + 2*lp_wall, h = base_h - lp_bot + 0.5, $fn = 24);
+    // divider between DONE and CHRG, down to 0.3 mm above the PCB: light from
+    // one LED can't reach the end of the other rod through the gap under the tubes
+    translate([(lp_pos[1][0] + lp_pos[2][0])/2 - lp_div_t/2, lp_pos[1][1] - (lp_bore/2 + lp_wall),
+               lp_pcb_top + 0.3])
+        cube([lp_div_t, lp_bore + 2*lp_wall, lp_bot - lp_pcb_top - 0.3 + 0.5]);
 }
 echo(str("LIGHT PIPES: acrylic rods d", lp_d, " mm: DONE, CHRG, PWR ", lp_len,
          " mm, LOW ", lp_len - pb_leds[0][3], " mm"));

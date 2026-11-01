@@ -2,7 +2,8 @@
 //  Custom plate for an Italian 503 wall box (3-module flush box)
 //  0.96" SPI OLED display | R503 fingerprint reader | AM312 PIR |
 //  doorbell push button | buzzer
-//  Reed tamper switch (magnet glued inside the box)
+//  Tamper: lever microswitch pressed by the box wall + reed switch (magnet
+//  glued inside the box), in series
 //  Perimeter seal: 2 mm rubber cord (nitrile or closed-cell silicone
 //  foam) pressed into a groove on the back (seal = "cord"), or a TPU
 //  gasket printed separately or as multi-material (seal = "tpu").
@@ -22,7 +23,7 @@
 
 /* [Plate] */
 plate_w      = 120;   // width
-plate_h      = 80;    // height
+plate_h      = 85;    // height (covers the unplastered edge around the box)
 plate_t      = 3.5;   // thickness (the R503 nut clamps up to ~10 mm)
 corner_r     = 5;     // corner radius
 edge_chamfer = 0.8;   // front edge chamfer
@@ -91,6 +92,33 @@ reed_len      = 14.4;  // 14 mm body + clearance
 reed_w        = 3.5;   // 3.2 mm body + clearance
 reed_wall     = 1.2;   // cradle wall thickness
 reed_wall_h   = 3.4;   // wall height (the reed fits completely inside)
+
+/* [503 box (BTicino-type datasheet) and how it sits in the wall] */
+box_in_w     = 98.2;  // inner opening
+box_in_h     = 62;
+box_recess   = 2.5;   // box rim behind the wall surface (measured 2-3 mm)
+box_depth    = 55;    // from the wall surface to the bottom of the box
+
+/* [Lever microswitch tamper (standard 28 x 16 x 10, C/NO/NC)] */
+// The switch sits inside the box, against a fin printed on the back of the
+// plate, with its lever facing the LEFT inner wall of the box. When the plate
+// is screwed on, the lever slides along the box rim and stays pressed by the
+// inner wall: plate removed = lever released = alarm. Wired in series with
+// the reed. Cut the lever to ms_lever_over mm beyond the body and bend it so
+// that its tip stands ~4 mm off the body: test with a multimeter that it
+// clicks when pressed flat against a wall ms_wall_gap mm from the body.
+use_ms        = true;
+ms_L          = 28;     // body length (along the depth of the box)
+ms_H          = 16;     // body height: lever side faces the box wall
+ms_T          = 10;     // body thickness (screws go through it)
+ms_y          = 21.5;   // centre of the body thickness (top-left corner of the box)
+ms_wall_gap   = 1.5;    // lever face of the body to the box inner wall
+ms_lever_over = 10;     // lever length beyond the front end of the body (cut it)
+ms_hole_d     = 3.1;    // body holes (MEASURE: standard V switch 3.1 mm,
+ms_hole_pitch = 22.2;   //  22.2 mm apart, 5.1 mm from the side opposite
+ms_hole_side  = 5.1;    //  the lever)
+ms_fin_t      = 3;      // fin the switch is screwed to (M3 self-tapping, or M2.5 + nut)
+ms_pilot_d    = 2.6;
 
 /* [Seal] */
 part             = "all";      // "plate", "gasket" (TPU only) or "all" (preview)
@@ -229,6 +257,42 @@ module gasket() {
         linear_extrude(gasket_groove + gasket_h) gasket_ring_2d();
 }
 
+// lever microswitch: z of the front end of the body (towards the plate) so that
+// the cut lever tip reaches the box rim
+ms_z0 = plate_t + box_recess + 1 + ms_lever_over;
+ms_xl = -(box_in_w/2 - ms_wall_gap);              // lever face of the body (left)
+
+module microswitch_fin() {
+    // fin above the switch (towards the top wall of the box), from the plate up
+    fy = ms_y + ms_T/2;
+    difference() {
+        union() {
+            translate([ms_xl, fy, plate_t - 0.5])
+                cube([ms_H, ms_fin_t, ms_z0 + ms_L - plate_t + 0.5]);
+            // gussets at the base
+            for (gx = [ms_xl + 1.5, ms_xl + ms_H - 1.5 - 2])
+                translate([gx, fy, plate_t - 0.5])
+                    rotate([90, 0, 90]) linear_extrude(2)
+                        polygon([[0, 0], [-4, 0], [0, 9]]);
+        }
+        // holes for the switch screws
+        for (dz = [-ms_hole_pitch/2, ms_hole_pitch/2])
+            translate([ms_xl + ms_H - ms_hole_side, fy - 0.1, ms_z0 + ms_L/2 + dz])
+                rotate([-90, 0, 0]) cylinder(d = ms_pilot_d, h = ms_fin_t + 0.2, $fn = 24);
+    }
+}
+
+// preview only: switch body and lever
+module microswitch_preview() {
+    color("DarkSlateGray")
+        translate([ms_xl, ms_y - ms_T/2, ms_z0]) cube([ms_H, ms_T, ms_L]);
+    color("Silver")   // lever, pressed against the wall
+        hull() {
+            translate([ms_xl - 0.5, ms_y - 2, ms_z0 + ms_L - 3]) cube([0.5, 4, 0.5]);
+            translate([ms_xl - ms_wall_gap + 0.3, ms_y - 2, ms_z0 - ms_lever_over]) cube([0.5, 4, 0.5]);
+        }
+}
+
 module plate() {
 difference() {
     plate_body();
@@ -257,11 +321,16 @@ oled_mounts();
 pir_boss();
 buzzer_mount();
 reed_cradle();
+if (use_ms) microswitch_fin();
 }
 
 if (part == "plate" || part == "all") plate();
 if (seal == "tpu" && (part == "gasket" || part == "all")) color("DimGray") gasket();
 if (seal == "cord" && part == "all") color("Black") cord_preview();
+if (use_ms && part == "all") microswitch_preview();
+echo(str("MICROSWITCH: body from ", ms_z0 - plate_t, " to ", ms_z0 + ms_L - plate_t,
+         " mm behind the plate, terminals to ", ms_z0 + ms_L + 8 - plate_t,
+         " (box depth ", box_depth, "). Lever cut to ", ms_lever_over, " mm beyond the body."));
 
 // The front face is the one on the print bed (z = 0):
 // print it like this, no supports. The back faces up.

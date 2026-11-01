@@ -130,7 +130,8 @@ ms_pilot_d    = 2.6;
 // bottom-right corner. Wires from the plate parts reach the screw terminals
 // on the left end. The tray is a separate part (part = "rj45_tray"),
 // printed flat, held by 2 M3 self-tapping screws; the boards by 2 cable ties.
-// ASSUMED: each jack sits on a 33 mm long side, terminals at the other end.
+// Checked on the real boards: jack on one short end, lever terminals at the
+// other end (wires enter from the end opposite the jack).
 use_rj45      = true;
 rj_len        = 33;     // board length, jack end to terminal end (along x)
 rj_w          = 48;     // the two boards side by side (along y)
@@ -336,8 +337,10 @@ module rj45_tray() {
     difference() {
         union() {
             translate([rj_x0 - 0.3 - rj_rail, -tw/2, 0]) cube([tl, tw, rj_floor_t]);
-            // rails on the terminal end and on the two long sides (height 4)
-            translate([rj_x0 - 0.3 - rj_rail, -tw/2, 0]) cube([rj_rail, tw, rj_floor_t + 4]);
+            // low stop at the terminal end (1.5 mm: lower than the board, so it
+            // never covers the wire entries of the lever terminals) and rails
+            // on the two long sides (height 4)
+            translate([rj_x0 - 0.3 - rj_rail, -tw/2, 0]) cube([rj_rail, tw, rj_floor_t + 1.5]);
             for (sy = [-1, 1]) translate([rj_x0 - 0.3 - rj_rail, sy > 0 ? tw/2 - rj_rail : -tw/2, 0])
                 cube([tl, rj_rail, rj_floor_t + 4]);
             // stiffening ribs underneath, between the posts

@@ -122,8 +122,28 @@ ms_hole_side  = 5.1;    //  the lever)
 ms_fin_t      = 3;      // fin the switch is screwed to (M3 self-tapping, or M2.5 + nut)
 ms_pilot_d    = 2.6;
 
+/* [RJ45 breakout pair (33 x 48 board, two jacks), on a tray behind the display] */
+// The two breakouts (still joined, 33 x 48) lie on a tray screwed to two posts
+// of the plate, ~30 mm behind it: everything on the plate (reader, display,
+// button) is shallower. The jacks face RIGHT (towards the push button side,
+// as seen from the street) and the plugs come from the conduit in the
+// bottom-right corner. Wires from the plate parts reach the screw terminals
+// on the left end. The tray is a separate part (part = "rj45_tray"),
+// printed flat, held by 2 M3 self-tapping screws; the boards by 2 cable ties.
+// ASSUMED: each jack sits on a 33 mm long side, terminals at the other end.
+use_rj45      = true;
+rj_len        = 33;     // board length, jack end to terminal end (along x)
+rj_w          = 48;     // the two boards side by side (along y)
+rj_jack_x     = 0;      // x of the jack end of the boards (seen from the street)
+rj_jack_h     = 14;     // jack height above the board (preview only, MEASURE)
+rj_floor_z    = 30;     // tray underside, mm behind the plate's back
+rj_floor_t    = 2.5;
+rj_rail       = 3;      // side rails that keep the boards in place
+rj_post_d     = 8;
+rj_post_y     = 21;     // posts at (rj_jack_x - 1, +/- rj_post_y)
+
 /* [Seal] */
-part             = "all";      // "plate", "gasket" (TPU only) or "all" (preview)
+part             = "all";      // "plate", "rj45_tray", "gasket" (TPU only) or "all" (preview)
 seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"
 
 /* [Rubber cord] */
@@ -297,6 +317,52 @@ module microswitch_preview() {
         }
 }
 
+// RJ45 tray: posts on the plate, tray printed separately
+rj_x0 = rj_jack_x - rj_len;           // terminal end of the boards
+rj_posts = [[rj_jack_x - 1, rj_post_y], [rj_jack_x - 1, -rj_post_y]];
+
+module rj45_posts() {
+    for (p = rj_posts) translate([p[0], p[1], plate_t - 0.5])
+        difference() {
+            cylinder(d = rj_post_d, h = rj_floor_z + 0.5, $fn = 32);
+            translate([0, 0, rj_floor_z - 8]) cylinder(d = 2.6, h = 9, $fn = 20);  // M3 self-tapping
+        }
+}
+
+// tray in its own coordinates, underside at z = 0 (as printed)
+module rj45_tray() {
+    tw = rj_w + 0.6 + 2*rj_rail;           // overall width (y)
+    tl = rj_len + 0.6 + rj_rail;           // overall length (x), open on the jack side
+    difference() {
+        union() {
+            translate([rj_x0 - 0.3 - rj_rail, -tw/2, 0]) cube([tl, tw, rj_floor_t]);
+            // rails on the terminal end and on the two long sides (height 4)
+            translate([rj_x0 - 0.3 - rj_rail, -tw/2, 0]) cube([rj_rail, tw, rj_floor_t + 4]);
+            for (sy = [-1, 1]) translate([rj_x0 - 0.3 - rj_rail, sy > 0 ? tw/2 - rj_rail : -tw/2, 0])
+                cube([tl, rj_rail, rj_floor_t + 4]);
+            // stiffening ribs underneath, between the posts
+            translate([rj_jack_x - 4, -rj_post_y, -0.01]) cube([3, 2*rj_post_y, rj_floor_t]);
+        }
+        // screw holes over the posts (countersunk on top)
+        for (p = rj_posts) translate([p[0], p[1], -0.1]) {
+            cylinder(d = 3.4, h = rj_floor_t + 0.2, $fn = 20);
+            translate([0, 0, rj_floor_t - 1.6]) cylinder(d1 = 3.4, d2 = 6.4, h = 1.7, $fn = 24);
+        }
+        // cable tie slots across the boards
+        for (sy = [-1, 1]) translate([rj_x0 + rj_len*0.45 - 2, sy*(rj_w/2 + 0.3 + rj_rail/2) - 0.9, -0.1])
+            cube([4, 1.8, rj_floor_t + 4.2]);
+    }
+}
+
+module rj45_preview() {
+    translate([0, 0, plate_t + rj_floor_z]) {
+        color("Peru") rj45_tray();
+        color("DarkGreen") translate([rj_x0, -rj_w/2, rj_floor_t]) cube([rj_len, rj_w, 1.6]);
+        for (sy = [-1, 1]) color("Silver")
+            translate([rj_jack_x - 16, sy*rj_w/4 - 8, rj_floor_t + 1.6]) cube([16, 16, rj_jack_h]);
+    }
+}
+
 module plate() {
 difference() {
     plate_body();
@@ -326,9 +392,12 @@ pir_boss();
 buzzer_mount();
 reed_cradle();
 if (use_ms) microswitch_fin();
+if (use_rj45) rj45_posts();
 }
 
 if (part == "plate" || part == "all") plate();
+if (use_rj45 && part == "rj45_tray") rj45_tray();
+if (use_rj45 && part == "all") rj45_preview();
 if (seal == "tpu" && (part == "gasket" || part == "all")) color("DimGray") gasket();
 if (seal == "cord" && part == "all") color("Black") cord_preview();
 if (use_ms && part == "all") microswitch_preview();

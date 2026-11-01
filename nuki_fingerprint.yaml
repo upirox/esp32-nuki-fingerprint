@@ -923,6 +923,7 @@ sensor:
           send_every: 6
     on_value:
       - component.update: batt_percent
+      - component.update: power_status
 
   # Percentage estimated from a Li-ion cell discharge curve.
   # On mains power the cell is charging: the percentage is only indicative.
@@ -980,8 +981,9 @@ binary_sensor:
             - logger.log:
                 level: WARN
                 format: "Mains power lost: power saving mode"
-      # strip and ring always follow, even during boot
+      # strip, ring and power status always follow, even during boot
       - script.execute: restore_strip
+      - component.update: power_status
       - if:
           condition:
             lambda: "return !id(screen_on);"
@@ -995,8 +997,9 @@ binary_sensor:
             - text_sensor.template.publish:
                 id: last_event
                 state: "Mains power restored"
-      # strip and ring always follow, even during boot
+      # strip, ring and power status always follow, even during boot
       - script.execute: restore_strip
+      - component.update: power_status
       - if:
           condition:
             lambda: "return !id(screen_on);"
@@ -1211,3 +1214,29 @@ text_sensor:
   - platform: template
     id: last_event
     name: Last Event
+
+  # UPS-style power state, like NUT: Online / Online - Charging /
+  # On Battery / On Battery - Low.
+  # There is no charge-status signal from the PowerBoost, so "charging" is
+  # inferred from the cell voltage: below ~4.12 V on mains the charger is
+  # certainly charging; above ~4.18 V it is full or in the final top-off
+  # (the yellow LED may still be on for the last minutes).
+  - platform: template
+    id: power_status
+    name: Power Status
+    icon: mdi:power-plug-battery
+    update_interval: never     # updated by battery voltage and mains changes
+    lambda: |-
+      static bool charging = false;
+      const float v = id(batt_voltage).state;
+      const float p = id(batt_percent).state;
+      if (id(mains_ok).state) {
+        if (!isnan(v)) {
+          if (v < 4.12f) charging = true;          // hysteresis: no flapping
+          else if (v > 4.18f) charging = false;
+        }
+        return {charging ? "Online - Charging" : "Online"};
+      }
+      charging = false;
+      if (!isnan(p) && p <= 20.0f) return {"On Battery - Low"};
+      return {"On Battery"};

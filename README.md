@@ -15,7 +15,7 @@ Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nu
 - **OLED display** woken by a PIR sensor. It never shows whether the door is locked (it faces the street): the fingerprint sensor ring tells it instead, blue = locked, green = already unlocked (colours set in `substitutions`).
 - **LED status strip** indoors: green = locked, red = unlocked, yellow = moving, red slow blink = alarm (reader locked out or tamper), purple = jammed, blue = Nuki unreachable.
 - **Doorbell** push button with LED ring; double ding-dong on an indoor buzzer, plus a Home Assistant `event` entity.
-- **Backup battery** (PowerBoost 1000C + Li-ion): mains/battery sensors, battery percentage and an automatic power saving mode during blackouts.
+- **Backup battery** (PowerBoost 1000C + Li-ion): mains/battery sensors, battery percentage, a UPS-style **Power Status** (Online / Online - Charging / On Battery / On Battery - Low) and an automatic power saving mode during blackouts.
 - Home Assistant **actions** to enroll/delete fingerprints, cancel the alarm and play tunes on the indoor buzzer.
 
 ## Files

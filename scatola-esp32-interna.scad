@@ -621,11 +621,12 @@ module lp_tubes() {
     // DONE and CHRG are close: join their tubes with a web (stiffer, no gap)
     hull() for (i = [1, 2]) translate([lp_pos[i][0], lp_pos[i][1], lp_bot])
         cylinder(d = lp_bore + 2*lp_wall, h = base_h - lp_bot + 0.5, $fn = 24);
-    // divider between DONE and CHRG, down to 0.3 mm above the PCB: light from
-    // one LED can't reach the end of the other rod through the gap under the tubes
+    // divider between DONE and CHRG, down to just above the LED tops (it never
+    // touches the LEDs, even with the board shifted in its cradle): it blocks the
+    // straight path from one LED to the end of the other rod
     translate([(lp_pos[1][0] + lp_pos[2][0])/2 - lp_div_t/2, lp_pos[1][1] - (lp_bore/2 + lp_wall),
-               lp_pcb_top + 0.3])
-        cube([lp_div_t, lp_bore + 2*lp_wall, lp_bot - lp_pcb_top - 0.3 + 0.5]);
+               lp_led_top + 0.1])
+        cube([lp_div_t, lp_bore + 2*lp_wall, lp_bot - lp_led_top - 0.1 + 0.5]);
 }
 echo(str("LIGHT PIPES: acrylic rods d", lp_d, " mm: DONE, CHRG, PWR ", lp_len,
          " mm, LOW ", lp_len - pb_leds[0][3], " mm"));

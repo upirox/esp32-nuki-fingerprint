@@ -35,8 +35,8 @@ screw_head_d = 7;     // countersunk head
 screw_head_h = 2;
 
 /* [0.96" OLED display (25.2 x 26 board)] */
-oled_x       = -19;   // board centre position
-oled_y       = 13;
+oled_x       = -20;   // board centre position (left column, above the reader)
+oled_y       = 16;
 oled_pcb_w   = 25.2;
 oled_pcb_h   = 26;
 oled_win_w   = 23;    // visible window (active area ~21.7 x 10.9)
@@ -50,30 +50,31 @@ oled_pin_h   = 3.5;
 oled_post_d  = 4;
 
 /* [R503 reader (M25 thread, 28 mm flange)] */
-r503_x       = 12;
-r503_y       = 0;
+r503_x       = -20;   // left column, below the display
+r503_y       = -14;
 r503_hole_d  = 25.6;  // M25 thread clearance
 
 /* [AM312 PIR (~10 mm lens, 12 mm wide)] */
-pir_x        = 36;
-pir_y        = 14;
+pir_x        = 24;   // right column, above the push button
+pir_y        = 18;
 pir_hole_d   = 10.2;  // the lens goes through, the 12 mm rim seats against the plate
 pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 
 /* [Vandal-proof doorbell button (22 head, 19 hole, 14 thread, 27 depth)] */
-btn_x        = -22;
-btn_y        = -13.5;
+btn_x        = 24;   // right column, below the PIR
+btn_y        = -12;
 btn_hole_d   = 19.3;  // 19 mm mounting hole + clearance
 
 /* [Buzzer (32.5 x 13 module, hidden behind the plate)] */
-buzz_x        = -40;   // centre of the buzzer cylinder
-buzz_y        = 14;
+buzz_x        = -42;   // centre of the buzzer cylinder (top-left corner)
+buzz_y        = 22;
 buzz_d        = 12;    // buzzer cylinder diameter
 buzz_h        = 9.5;   // cylinder height above the PCB
 buzz_ring_h   = 6;     // height of the retaining ring
 buzz_ring_w   = 1.2;
-buzz_pcb_dir  = 1;     // the module extends towards +x (1) or -x (-1)
+buzz_pcb_dir  = 1;     // (only for the optional post) the module can be turned freely:
+                       // point its PCB DOWN, beside the display, away from the OLED wires
 buzz_hole_off = 9.5;   // distance of the module's M3 hole from the buzzer centre
 buzz_use_post = false; // the post would land on the OLED board: the module
                        // is held by the ring + a drop of hot glue
@@ -86,8 +87,8 @@ sound_holes   = true;  // false = solid plate (much quieter sound)
 // The reed sits in a cradle on the back, parallel to the bottom edge of
 // the box. The magnet (6 x 2 mm) is glued to the inside wall of the box,
 // facing ONE END of the reed body.
-reed_x        = 29;    // centre of the reed body
-reed_y        = -22;   // closer to the box edge = stronger magnet effect
+reed_x        = -41;   // centre of the reed body (bottom-left, close to the box bottom wall)
+reed_y        = -26;   // closer to the box edge = stronger magnet effect
 reed_len      = 14.4;  // 14 mm body + clearance
 reed_w        = 3.5;   // 3.2 mm body + clearance
 reed_wall     = 1.2;   // cradle wall thickness
@@ -101,13 +102,14 @@ box_depth    = 55;    // from the wall surface to the bottom of the box
 
 /* [Lever microswitch tamper (standard 28 x 16 x 10, C/NO/NC)] */
 // The switch sits inside the box, against a fin printed on the back of the
-// plate, with its lever facing the LEFT inner wall of the box. When the plate
+// plate, with its lever facing a side inner wall of the box. When the plate
 // is screwed on, the lever slides along the box rim and stays pressed by the
-// inner wall: plate removed = lever released = alarm. Wired in series with
+// inner wall (ms_side): plate removed = lever released = alarm. Wired in series with
 // the reed. Cut the lever to ms_lever_over mm beyond the body and bend it so
 // that its tip stands ~4 mm off the body: test with a multimeter that it
 // clicks when pressed flat against a wall ms_wall_gap mm from the body.
 use_ms        = true;
+ms_side       = 1;      // 1 = right inner wall (top-right corner), -1 = left
 ms_L          = 28;     // body length (along the depth of the box)
 ms_H          = 16;     // body height: lever side faces the box wall
 ms_T          = 10;     // body thickness (screws go through it)
@@ -260,24 +262,26 @@ module gasket() {
 // lever microswitch: z of the front end of the body (towards the plate) so that
 // the cut lever tip reaches the box rim
 ms_z0 = plate_t + box_recess + 1 + ms_lever_over;
-ms_xl = -(box_in_w/2 - ms_wall_gap);              // lever face of the body (left)
+ms_xf = ms_side*(box_in_w/2 - ms_wall_gap);       // lever face of the body
+ms_x0 = ms_side > 0 ? ms_xf - ms_H : ms_xf;        // body x range: ms_x0 .. ms_x0 + ms_H
+ms_xh = ms_side > 0 ? ms_x0 + ms_hole_side : ms_x0 + ms_H - ms_hole_side;  // screw holes
 
 module microswitch_fin() {
     // fin above the switch (towards the top wall of the box), from the plate up
     fy = ms_y + ms_T/2;
     difference() {
         union() {
-            translate([ms_xl, fy, plate_t - 0.5])
+            translate([ms_x0, fy, plate_t - 0.5])
                 cube([ms_H, ms_fin_t, ms_z0 + ms_L - plate_t + 0.5]);
             // gussets at the base
-            for (gx = [ms_xl + 1.5, ms_xl + ms_H - 1.5 - 2])
+            for (gx = [ms_x0 + 1.5, ms_x0 + ms_H - 1.5 - 2])
                 translate([gx, fy, plate_t - 0.5])
                     rotate([90, 0, 90]) linear_extrude(2)
                         polygon([[0, 0], [-4, 0], [0, 9]]);
         }
         // holes for the switch screws
         for (dz = [-ms_hole_pitch/2, ms_hole_pitch/2])
-            translate([ms_xl + ms_H - ms_hole_side, fy - 0.1, ms_z0 + ms_L/2 + dz])
+            translate([ms_xh, fy - 0.1, ms_z0 + ms_L/2 + dz])
                 rotate([-90, 0, 0]) cylinder(d = ms_pilot_d, h = ms_fin_t + 0.2, $fn = 24);
     }
 }
@@ -285,11 +289,11 @@ module microswitch_fin() {
 // preview only: switch body and lever
 module microswitch_preview() {
     color("DarkSlateGray")
-        translate([ms_xl, ms_y - ms_T/2, ms_z0]) cube([ms_H, ms_T, ms_L]);
+        translate([ms_x0, ms_y - ms_T/2, ms_z0]) cube([ms_H, ms_T, ms_L]);
     color("Silver")   // lever, pressed against the wall
         hull() {
-            translate([ms_xl - 0.5, ms_y - 2, ms_z0 + ms_L - 3]) cube([0.5, 4, 0.5]);
-            translate([ms_xl - ms_wall_gap + 0.3, ms_y - 2, ms_z0 - ms_lever_over]) cube([0.5, 4, 0.5]);
+            translate([ms_xf + ms_side*0.25 - 0.25, ms_y - 2, ms_z0 + ms_L - 3]) cube([0.5, 4, 0.5]);
+            translate([ms_xf + ms_side*(ms_wall_gap - 0.55) - 0.25, ms_y - 2, ms_z0 - ms_lever_over]) cube([0.5, 4, 0.5]);
         }
 }
 

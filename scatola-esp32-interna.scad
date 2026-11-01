@@ -170,6 +170,28 @@ pb_l       = 36.2;
 pb_w       = 22.9;
 pb_x       = 44;
 pb_y       = 22;
+// Mount the board with the micro-USB towards the ESP32 (left) and the row of
+// pads (USB, Bat, Vs, EN, GND, 5V) at the bottom: the light pipes line up with
+// its LEDs only this way.
+
+/* [PowerBoost LED light pipes (lid)] */
+// Clear acrylic rods from the four PowerBoost LEDs to the lid, flush with its
+// face: LOW (red), DONE (green), CHRG (orange), PWR (blue). Each rod runs in its
+// own tube hanging from the lid, so the light of an LED doesn't leak into the
+// rod next to it (DONE and CHRG are only 3.6 mm apart). Rod length: see the
+// LIGHT PIPES line in the console. Sand the outer end matt (grit 400-600),
+// keep the LED end polished.
+use_lightpipes = true;
+lp_d        = 2;      // rod diameter (2 mm acrylic rod)
+lp_hole     = 2.1;    // hole in the lid: press fit
+lp_bore     = 2.25;   // bore of the tubes
+lp_wall     = 1;      // tube wall
+lp_led_gap  = 1;      // rod end to LED top
+// LED positions on the board (Adafruit Eagle file, Rev B), from the board's
+// corner at the micro-USB / pad-row side: [x, y, name]
+// 4th value: how much higher that tube/rod stops (LOW sits next to the 6 mm
+// tall JST battery connector, so its tube stops above it)
+pb_leds = [[5.429, 20.861, "LOW", 6], [6.223, 1.143, "DONE", 0], [9.779, 1.143, "CHRG", 0], [33.723, 1.556, "PWR", 0]];
 
 /* [230 V power supply bay (at the bottom, full width between the columns)] */
 psu_x0     = -60;   // left wall of the bay (the corner columns stay outside)
@@ -491,6 +513,8 @@ module lid_assembled() {
             // diffuser, so the LEDs merge into one even bar. Print the lid in white
             // or line the inside of the box with white paint / aluminium tape.
             if (use_lightbox) lightbox();
+            // tubes guiding the PowerBoost light pipes
+            if (use_lightpipes) lp_tubes();
             // ring that holds the buzzer
             translate([buzz_x, buzz_y, z0 - buzz_ring_h])
             difference() {
@@ -507,6 +531,12 @@ module lid_assembled() {
         // logo recess on the visible face
         if (logo_mode != "none")
             translate([0, 0, z0 + lid_t - logo_depth]) logo_solid("all", logo_depth + 0.1);
+        // PowerBoost light pipe holes (through the lid and the tubes)
+        if (use_lightpipes) for (p = lp_pos)
+            translate([p[0], p[1], lp_bot + p[2] - 0.1]) {
+                cylinder(d = lp_bore, h = base_h - lp_bot - p[2] + 0.1, $fn = 24);
+                translate([0, 0, base_h - lp_bot - p[2]]) cylinder(d = lp_hole, h = lid_t + 0.3, $fn = 24);
+            }
         // light window + diffuser pocket (on the inside)
         translate([0, strip_y, z0 - 0.1])
             linear_extrude(lid_t + 0.2) offset(win_h/2 - 0.01) square([win_w - win_h, 0.02], center = true);
@@ -574,6 +604,24 @@ module logo_part_print(which) {
     rotate([180, 0, 0]) translate([0, 0, -(base_h + lid_t)])
         translate([0, 0, base_h + lid_t - logo_depth]) logo_solid(which, logo_depth);
 }
+
+// ---------------- POWERBOOST LIGHT PIPES ----------------
+pb_x0 = pb_x - pb_l/2;                 // board corner on the micro-USB / pads side
+pb_y0 = pb_y - pb_w/2;
+lp_pos = [for (l = pb_leds) [pb_x0 + l[0], pb_y0 + l[1], l[3]]];
+lp_led_top = floor_t + 2 + 1.6 + 0.8;  // feet + PCB + 0805 LED
+lp_bot = lp_led_top + lp_led_gap;      // bottom of the tubes and of the rods
+lp_len = base_h + lid_t - lp_bot;      // rod length, flush with the lid face
+
+module lp_tubes() {
+    for (p = lp_pos) translate([p[0], p[1], lp_bot + p[2]])
+        cylinder(d = lp_bore + 2*lp_wall, h = base_h - lp_bot - p[2] + 0.5, $fn = 24);
+    // DONE and CHRG are close: join their tubes with a web (stiffer, no gap)
+    hull() for (i = [1, 2]) translate([lp_pos[i][0], lp_pos[i][1], lp_bot])
+        cylinder(d = lp_bore + 2*lp_wall, h = base_h - lp_bot + 0.5, $fn = 24);
+}
+echo(str("LIGHT PIPES: acrylic rods d", lp_d, " mm: DONE, CHRG, PWR ", lp_len,
+         " mm, LOW ", lp_len - pb_leds[0][3], " mm"));
 
 // lid rotated for printing: visible face on the bed
 module lid_print() {

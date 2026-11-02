@@ -36,8 +36,9 @@
 //    "separator" (only with the OLD layout, pack under the board)
 //    "all"      assembled preview with the lid lifted
 //
-//  Screws: 4 x M3 x 8 in the lid, 2 x M3 x 8 in the battery door and
-//          2 x M3 x 6 in the 230 V cover, driven into 8 brass M3 heat-set inserts (soldering iron tip at
+//  Lid and battery door: held by 12 hidden 8 x 2 mm magnets (lid_fix), no
+//          screws on the front. 230 V cover: 2 x M3 x 6 into 2 brass M3
+//          heat-set inserts (soldering iron tip at
 //          ~220-240 C for PETG, keep the insert straight, don't force it),
 //          4 x 4 mm screws + wall plugs for the wall.
 //  Material: PETG or ASA (NOT PLA: there is a 230 V power supply inside).
@@ -90,7 +91,22 @@ lid_t    = 2.5;   // lid thickness
 corner_r = 4;     // outer corner radius
 fit      = 0.3;   // clearance between lid and walls
 
-/* [Lid screws: brass M3 heat-set inserts] */
+/* [Lid and door fixing] */
+// "magnets": no screws on the front. Neodymium discs glued into pockets in the
+//   columns and in the lid / door (closed 0.5 mm skin on the front: invisible).
+//   Mind the polarity: stack the magnets in pairs, mark the touching faces,
+//   glue one of each pair in the column and the other in the lid (cyanoacrylate
+//   or epoxy). To open: remove the door with a fingernail in the notch at the
+//   bottom edge, then lift the lid from the notch in the dividing wall.
+// "screws": countersunk M3 screws into heat-set inserts (visible on the front)
+// The 230 V cover inside always stays screwed.
+lid_fix  = "magnets";
+mag_d    = 8;     // magnet diameter (8 x 2 mm N52 discs, 12 needed)
+mag_h    = 2;     // magnet thickness (lid_t - 0.5 at most)
+mag_clr  = 0.2;   // pocket clearance on the diameter
+notch_w  = 16;    // fingernail notches (door bottom edge, dividing wall)
+
+/* [Lid screws: brass M3 heat-set inserts (lid_fix = "screws")] */
 use_inserts  = true;  // false = self-tapping screws straight into the plastic
 insert_d     = 4.0;   // hole for the insert (short M3, 5.7 mm type: 4.0 | check
                       // your insert's datasheet, usually 4.0-4.2)
@@ -355,7 +371,15 @@ module base() {
             pb_cradle();
         }
         // lid screw holes (heat-set inserts or self-tapping screws)
-        for (p = concat(boss_pos, door_boss)) screw_hole_in(p, base_h);
+        if (lid_fix == "magnets") {
+            for (p = concat(boss_pos, door_boss)) translate([p[0], p[1], base_h - mag_h - 0.1])
+                cylinder(d = mag_d + mag_clr, h = mag_h + 0.2);
+            // fingernail notch under the bottom edge of the door (outer wall rim)
+            translate([-notch_w/2, bay_y0 - wall - 0.1, base_h - 1.2]) cube([notch_w, wall + 0.2, 1.3]);
+            // notch in the dividing wall under the bottom edge of the lid (door removed)
+            translate([-notch_w/2, div_y0 - 0.1, base_h - 1.2]) cube([notch_w, div_t/2 + 1.1, 1.3]);  // reaches 1 mm under the lid
+        } else
+            for (p = concat(boss_pos, door_boss)) screw_hole_in(p, base_h);
         // slot for the battery wires in the dividing wall (open at the top)
         translate([bat_slot_x - bat_slot_w/2, div_y0 - 0.1, floor_t + 3])
             cube([bat_slot_w, div_t + 0.2, base_h]);
@@ -584,7 +608,9 @@ module lid_assembled() {
             }
         }
         // lid screws, countersunk on the front
-        for (p = boss_pos) translate([p[0], p[1], z0 - 0.1]) {
+        if (lid_fix == "magnets") for (p = boss_pos) translate([p[0], p[1], z0 - 0.1])
+            cylinder(d = mag_d + mag_clr, h = mag_h + 0.1);
+        if (lid_fix == "screws") for (p = boss_pos) translate([p[0], p[1], z0 - 0.1]) {
             cylinder(d = lid_screw_d, h = lid_t + 0.2);
             translate([0, 0, lid_t - lid_head_h + 0.1])
                 cylinder(d1 = lid_screw_d, d2 = lid_head_d, h = lid_head_h);
@@ -704,7 +730,9 @@ module door_assembled() {
                 translate([pack_x + sx*pack_dx/4 - 0.8, pack_y - pack_dy/2 + 6, floor_t + pack_t + 1])
                     cube([1.6, pack_dy - 12, z0 - floor_t - pack_t - 1 + 0.5]);
         }
-        for (p = door_boss) translate([p[0], p[1], z0 - 0.1]) {
+        if (lid_fix == "magnets") for (p = door_boss) translate([p[0], p[1], z0 - 0.1])
+            cylinder(d = mag_d + mag_clr, h = mag_h + 0.1);
+        if (lid_fix == "screws") for (p = door_boss) translate([p[0], p[1], z0 - 0.1]) {
             cylinder(d = lid_screw_d, h = lid_t + 0.2);
             translate([0, 0, lid_t - lid_head_h + 0.1])
                 cylinder(d1 = lid_screw_d, d2 = lid_head_d, h = lid_head_h);

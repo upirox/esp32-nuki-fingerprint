@@ -20,8 +20,9 @@
 //  plate can be removed.
 //
 //  Box position: right wall of the box "gap" mm from the left edge of the
-//  plate, box centre (-box_side_y) mm ABOVE the plate centre, so that its
-//  side opening is centred on the plate (default: 25 mm above).
+//  plate, TOP edge of the box box_top_y mm above the plate centre, so that
+//  its side opening is centred on the plate (default: 107.4 mm above; the
+//  ENCLOSURE line in the console of the box file gives the same number).
 //
 //  Coordinates: x to the right (x = 0 at the left edge of the plate),
 //  y up (y = 0 at the plate centre), z out of the wall (z = 0 on the wall).
@@ -62,8 +63,9 @@ mod_w    = win_w/3; // window modules, from the left: pre-drilled blank,
 
 /* [Box (for the preview only)] */
 box_out_w = 144.8;
-box_out_h = 164.8;
-box_side_y = -25;   // centre of the side opening, from the box centre
+box_out_h = 233.2;
+box_out_d = 35.6;
+box_top_y = 107.4;  // top edge of the box above the side opening centre
 
 $fn = 48;
 
@@ -146,8 +148,8 @@ cover();
 module env_preview() {
     intersection() { env(); translate([-1, -pl_h/2, 0]) cube([pl_w + 2, pl_h, 30]); }
     translate([hole_x, hole_dy, blank_z - 2]) color("red") cylinder(d = hole_d, h = 2.1);
-    translate([-gap - box_out_w, -box_side_y - box_out_h/2, 0])
-        cube([box_out_w, box_out_h, 51.6]);
+    translate([-gap - box_out_w, box_top_y - box_out_h, 0])
+        cube([box_out_w, box_out_h, box_out_d]);
 }
 
 echo(str("COVER: cap top ", cap_zi + t, " mm from the wall, ",

@@ -3,7 +3,9 @@
 //  Holds: ESP32 38 pin on a screw terminal expansion board,
 //         indoor buzzer (doorbell / sirens),
 //         WS2812B strip, 144 LEDs/m (12 LEDs) = door status light,
-//         PowerBoost 1000C + 3 x 18650 pack (backup battery),
+//         PowerBoost 1000C + 3 x 18650 pack (backup battery) in a
+//         BATTERY BAY at the bottom, with its own front door (swap the
+//         pack without opening the main lid),
 //         230 V -> 5 V 2 A power supply (Mean Well IRM-10-5) in a
 //         SEPARATE BAY with its own cover (opening the enclosure to work
 //         on the board never exposes live parts).
@@ -22,6 +24,8 @@
 //    "base"     enclosure, printed with the back on the bed
 //    "lid"      printed with the visible face on the bed
 //    "lid230"   cover of the 230 V bay (2 M3 screws)
+//    "door"     front door of the battery bay (2 M3 screws), printed with
+//               the visible face on the bed
 //    "diffuser" LED window diffuser, depends on diff_type:
 //               "plug" (default): printed plug, flush with the lid face.
 //                 Print it in WHITE PETG, front face on the bed, 100% infill;
@@ -29,13 +33,11 @@
 //               "printed": flat diffuser in a pocket on the inside of the lid.
 //               "pmma": nothing to print, cut an OPAL acrylic bar to
 //                 diff_pmma_l x diff_pmma_w (sits behind the window, recessed)
-//    "separator" insulating plate (board footprint) that slides over the 4
-//               board standoffs and rests on the battery pack: the solder
-//               joints under the board can never touch the pack
+//    "separator" (only with the OLD layout, pack under the board)
 //    "all"      assembled preview with the lid lifted
 //
-//  Screws: 4 x M3 x 8 in the lid and 2 x M3 x 6 in the 230 V cover,
-//          driven into 6 brass M3 heat-set inserts (soldering iron tip at
+//  Screws: 4 x M3 x 8 in the lid, 2 x M3 x 8 in the battery door and
+//          2 x M3 x 6 in the 230 V cover, driven into 8 brass M3 heat-set inserts (soldering iron tip at
 //          ~220-240 C for PETG, keep the insert straight, don't force it),
 //          4 x 4 mm screws + wall plugs for the wall.
 //  Material: PETG or ASA (NOT PLA: there is a 230 V power supply inside).
@@ -46,9 +48,15 @@
 //
 //  LAYOUT (vertical, outer width < 15 cm):
 //    top      LED status strip (12 LEDs, 83 mm) inside a light box
-//    middle   ESP32 board on the left (USB-C to the right), ABOVE the 3 x 18650 pack
-//             (tall standoffs) | PowerBoost 1000C and buzzer on the right
-//    bottom   230 V bay with the power supply (gland in the bottom wall)
+//    middle   ESP32 board on the left (USB-C to the right) on low standoffs |
+//             PowerBoost 1000C and buzzer on the right
+//    lower    230 V bay with the power supply
+//    bottom   battery bay (3 x 18650 pack lying), behind its own door, split
+//             from the rest by a full-height wall. The battery wires go
+//             through a slot in that wall (left corner) and up the left side,
+//             outside the 230 V bay. It is the coolest spot of the enclosure:
+//             the warm air of the power supply and of the PowerBoost rises.
+//    The pack is no longer under the board, so the enclosure is much thinner.
 //
 //  BEFORE PRINTING measure your screw terminal board and adjust
 //  board_w / board_h and board_hole_dx / board_hole_dy: boards on the
@@ -56,7 +64,7 @@
 // ============================================================
 
 /* [Part to export] */
-part = "all";            // "base", "lid", "lid230", "diffuser", "logo_chip", "logo_wifi", "all"
+part = "all";            // "base", "lid", "door", "lid230", "diffuser", "logo_chip", "logo_wifi", "all"
 
 /* [Logo on the lid (chip + Wi-Fi symbol)] */
 // "engrave": recessed symbol, fill it with paint (chip blue, Wi-Fi light blue)
@@ -73,9 +81,9 @@ logo_depth = 0.8;    // engraving depth (lid is lid_t thick)
 
 /* [Enclosure] */
 in_w     = 140;   // inner width (outer = +4.8 mm: max 150)
-in_h     = 160;   // inner height (room for the wires above and below the board)
-board_headroom = 20;  // room above the terminal board (ESP32 + terminals + wires)
-                      // computed inner depth: pack + 4 + board + this
+in_h     = 160;   // inner height of the main part (LED strip, board, 230 V bay)
+board_headroom = 20;  // min. room above the terminal board (ESP32 + terminals + wires)
+                      // inner depth = the largest of board / power supply / pack needs
 wall     = 2.4;   // wall thickness
 floor_t  = 3;     // back thickness
 lid_t    = 2.5;   // lid thickness
@@ -102,8 +110,8 @@ board_h       = 63;   // bottom sides, USB-C to the right (plug passes over the 
 board_hole_dx = 72;   // mounting hole spacing (MEASURE IT), 3 mm holes
 board_hole_dy = 57;
 standoff_d    = 8;
-standoff_air  = 5;    // gap between battery pack and board: strap + separator + air
-use_separator = true; // insulating plate between the pack and the solder side of the board
+board_standoff= 6;    // board height above the floor (air under the solder joints)
+use_separator = false;// (OLD layout only: plate between the pack and the board)
 sep_t         = 1.2;  // separator thickness (PETG, 100% infill)
 standoff_pilot= 2.5;  // M3 self-tapping or M2.5 screw
 board_guides  = true; // L-shaped corner guides that centre the board
@@ -158,12 +166,22 @@ cable_d  = 32;
 /* [Backup battery: 3 x 18650 pack in parallel (MEASURE IT)] */
 pack_l     = 68;    // long side of the pack (cell length + wrap)
 pack_w     = 58;    // short side (3 cells side by side)
-pack_horizontal = false; // false: long side vertical, between the board standoffs (72 x 57)
-pack_t     = 19.5;  // thickness: sets the depth of the enclosure
-pack_x     = board_x;  // under the board
-pack_y     = board_y;
+pack_horizontal = true; // long side horizontal, in the battery bay
+pack_t     = 19.5;  // thickness
 pack_wall_h= 8;     // cradle height (a velcro strap holds the rest)
 strap_w    = 16;    // slots for the strap that holds the pack
+
+/* [Battery bay (bottom) and its door] */
+div_t      = 3;     // wall between the main part and the battery bay (lid and
+                    // door both rest on it)
+bay_margin = 1.5;   // room above and below the cradle
+bat_slot_x = -58;   // slot in the dividing wall for the battery wires (left
+                    // corridor, between the lid column and the 230 V bay)
+bat_slot_w = 4;     // 2 wires (the JST stays on the PowerBoost side: lay the
+                    // wires in the slot from the top, nothing to thread)
+door_ribs  = true;  // ribs on the inside of the door, 1 mm above the pack:
+                    // it can't come out of the cradle even if the strap loosens
+door_icon  = true;  // battery symbol engraved on the door
 
 /* [PowerBoost 1000C (without the USB-A socket)] */
 pb_l       = 36.2;
@@ -194,11 +212,12 @@ lp_led_gap  = 0.5;    // rod end to LED top (small: less light reaches the next 
 pb_leds = [[5.429, 20.861, "LOW", 6], [6.223, 1.143, "DONE", 0], [9.779, 1.143, "CHRG", 0], [33.723, 1.556, "PWR", 0]];
 
 /* [230 V power supply bay (at the bottom, full width between the columns)] */
-psu_x0     = -60;   // left wall of the bay (the corner columns stay outside)
+psu_x0     = -54;   // left wall of the bay (left of it: corridor for the battery wires)
 psu_x1     = 60;    // right wall
 psu_y1     = -25;   // top wall (below it is the outer wall of the enclosure)
 psu_wall   = 2;
-psu_top    = 5;     // the bay ends 5 mm below the rim of the enclosure
+psu_top    = 3.5;   // the bay ends 3.5 mm below the rim (cover top 1.5 mm below the lid)
+psu_comp_h = 21.5;  // tallest part on the supply board (IRM-10-5: 21.5 mm)
 psu_lid_t  = 2;
 mod_l      = 46;    // Mean Well IRM-10-5: 45.7 x 25.4 x 21.5 (other module: measure it)
 mod_w      = 25.5;
@@ -210,13 +229,13 @@ mod_y      = -50;
 use_psu_board = true;  // false = bare module glued in the cradle
 pcb_l      = 80;
 pcb_w      = 40;
-pcb_x      = -5;     // board centre: input end on the right (230 V entry),
+pcb_x      = 1;      // board centre: input end on the right (230 V entry),
 pcb_y      = (-in_h/2 + 2.5 + psu_y1 - 2)/2; // centred in the bay; output end on the left (5 V hole)
 pcb_hole_in= 2;      // hole centres 2 mm from the edges: 76 x 36 spacing
 pcb_pilot_d= 1.7;    // 2 mm board holes: M2 self-tapping screws (M2 x 6-8)
 pcb_post_d = 6;
-pcb_post_h = 8;      // board height above the floor
-use_gland  = false; // alternative: mains cable gland in the bottom wall of the bay
+pcb_post_h = 3;      // board height above the floor (room for the solder joints)
+use_gland  = false; // OLD layout only (bay against the bottom wall): mains cable gland
 gland_x    = 35;
 gland_d    = 16.2;  // M16 gland (cable 4.5-10 mm, e.g. 3G1.5); 12.6 for M12
 out_hole_d = 6;     // 5 V wires to the board (top wall of the bay)
@@ -227,9 +246,9 @@ ant_x    = -52;    // top wall, left: close to the ESP32 module (13 cm pigtail)
 ant_d    = 6.6;    // panel-mount SMA / RP-SMA connector
 
 /* [Wall mounting (holes in the back)] */
-// [-27,17] is under the battery pack and the board:
-// screw the enclosure to the wall BEFORE fitting them
-wall_holes   = [[-56,66],[55,52],[58,-8],[-27,17]];
+// [-27,17] is under the board: screw the enclosure to the wall BEFORE fitting it.
+// The last two are in the battery bay (between the cradle and the door columns)
+wall_holes   = [[-56,66],[55,52],[58,-8],[-27,17],[-50,-110],[50,-110]];
 wall_screw_d = 4.5;
 wall_head_d  = 8.5;
 
@@ -249,12 +268,28 @@ vent_pitch  = 6;
 $fn = 64;
 
 // ------------------------------------------------------------
-standoff_h = pack_t + standoff_air;
+standoff_h = board_standoff;
 pack_dx = pack_horizontal ? pack_l : pack_w;   // pack footprint along x / y
 pack_dy = pack_horizontal ? pack_w : pack_l;
-in_d  = standoff_h + 1.6 + board_headroom;   // inner depth
+// inner depth: the largest need among the board, the power supply and the pack
+in_d  = max(standoff_h + 1.6 + board_headroom,
+            pcb_post_h + 1.6 + psu_comp_h + 0.5 + psu_top,
+            pack_t + 3);
+// battery bay below the main part: y from bay_y0 to bay_y1
+cradle_dy = pack_dy + 2*0.6 + 2*1.6;
+div_y1 = -in_h/2;                 // top face of the dividing wall
+div_y0 = div_y1 - div_t;
+bay_y1 = div_y0;
+bay_y0 = bay_y1 - cradle_dy - 2*bay_margin;
+bay_yc = (bay_y0 + bay_y1)/2;
+seam_y = (div_y0 + div_y1)/2;     // lid / door joint
+pack_x = 0;
+pack_y = bay_yc;
+in_yc  = (in_h/2 + bay_y0)/2;     // centre of the whole inside
+in_ht  = in_h/2 - bay_y0;         // whole inner height
 out_w = in_w + 2*wall;
-out_h = in_h + 2*wall;
+out_h = in_ht + 2*wall;
+door_boss = [for (sx = [-1,1]) [sx*(in_w/2 - boss_d/2 + 0.5), bay_yc]];
 base_h = floor_t + in_d;
 strip_len = led_n * led_pitch;
 // LED to diffuser = led_gap: with the acrylic bar below the lid the rib is lower
@@ -267,7 +302,7 @@ win_w = strip_len - 4;
 // the columns sink 0.5 mm into the walls: if they were merely tangent
 // OpenSCAD would report "not a valid 2-manifold"
 boss_pos = [for (sx=[-1,1], sy=[-1,1]) [sx*(in_w/2 - boss_d/2 + 0.5), sy*(in_h/2 - boss_d/2 + 0.5)]];
-psu_y0   = -in_h/2;
+psu_y0   = div_y1;
 pcb_posts = [for (sx = [-1,1], sy = [-1,1]) [pcb_x + sx*(pcb_l/2 - pcb_hole_in), pcb_y + sy*(pcb_w/2 - pcb_hole_in)]];
 cable_y  = psu_y1 - psu_wall/2;          // hole centred on the wall of the bay
 psu_ztop = floor_t + in_d - psu_top;     // height of the bay walls
@@ -298,10 +333,14 @@ module base() {
     difference() {
         union() {
             difference() {
-                rrect(out_w, out_h, corner_r, base_h);
-                translate([0, 0, floor_t])
-                    rrect(in_w, in_h, max(corner_r - wall, 0.5), base_h);
+                translate([0, in_yc, 0]) rrect(out_w, out_h, corner_r, base_h);
+                translate([0, in_yc, floor_t])
+                    rrect(in_w, in_ht, max(corner_r - wall, 0.5), base_h);
             }
+            // wall between the main part and the battery bay (full height)
+            translate([-in_w/2 - 0.5, div_y0, 0]) cube([in_w + 1, div_t, base_h]);
+            // columns for the door screws
+            for (p = door_boss) translate([p[0], p[1], 0]) cylinder(d = boss_d, h = base_h);
             // columns for the lid screws
             for (p = boss_pos) translate([p[0], p[1], 0])
                 cylinder(d = boss_d, h = base_h);
@@ -316,7 +355,10 @@ module base() {
             pb_cradle();
         }
         // lid screw holes (heat-set inserts or self-tapping screws)
-        for (p = boss_pos) screw_hole_in(p, base_h);
+        for (p = concat(boss_pos, door_boss)) screw_hole_in(p, base_h);
+        // slot for the battery wires in the dividing wall (open at the top)
+        translate([bat_slot_x - bat_slot_w/2, div_y0 - 0.1, floor_t + 3])
+            cube([bat_slot_w, div_t + 0.2, base_h]);
         // standoff holes
         for (sx = [-1,1], sy = [-1,1])
             translate([board_x + sx*board_hole_dx/2, board_y + sy*board_hole_dy/2, 1])
@@ -406,8 +448,8 @@ module led_rib() {
             cube([strip_len, 1.2, 1.2]);
 }
 
-// battery pack cradle under the board (long side horizontal if pack_horizontal).
-// Opening for the wires on the PowerBoost side, notches for the strap.
+// battery pack cradle in the battery bay (long side horizontal if pack_horizontal).
+// Opening for the wires on the left, notches for the strap.
 module pack_cradle() {
     c = 0.6; t = 1.6;
     X = pack_dx + 2*c; Y = pack_dy + 2*c;   // cradle inside
@@ -415,8 +457,8 @@ module pack_cradle() {
     difference() {
         translate([-X/2 - t, -Y/2 - t, 0]) cube([X + 2*t, Y + 2*t, pack_wall_h]);
         translate([-X/2, -Y/2, -0.1]) cube([X, Y, pack_wall_h + 0.2]);
-        // wire / connector passage towards the PowerBoost (right side)
-        translate([X/2 - 0.1, Y/2 - 22, 2]) cube([t + 0.2, 18, pack_wall_h]);
+        // wire passage on the left side, top end (towards the slot in the wall)
+        translate([-X/2 - t - 0.1, Y/2 - 20, 2]) cube([t + 0.2, 16, pack_wall_h]);
         // notches for the velcro strap (left and right sides)
         for (sx = [-1,1]) translate([sx*(X/2 + t/2), 0, pack_wall_h/2 + 0.1])
             cube([t + 0.4, strap_w, pack_wall_h], center = true);
@@ -496,18 +538,37 @@ module psu_lid() {
 }
 
 // ---------------- LID (in assembled position) ----------------
+// outline of the whole enclosure (2D), offset by o (negative = inwards)
+module outline2d(o = 0) {
+    r = max(corner_r + o, 0.5);
+    translate([0, in_yc]) offset(r) square([out_w + 2*o - 2*r, out_h + 2*o - 2*r], center = true);
+}
+// part of the outline above (top = true) or below the seam
+module half2d(top, o = 0, cut = 0) {
+    intersection() {
+        outline2d(o);
+        if (top) translate([-500, seam_y + cut]) square(1000);
+        else     translate([-500, seam_y - cut - 1000]) square(1000);
+    }
+}
+// centring lip: U-shaped (open on the dividing wall side), 3 mm deep
+module lip(top) {
+    o = -wall - fit;
+    linear_extrude(3) difference() {
+        half2d(top, o, div_t/2 + fit);
+        half2d(top, o - 1.6, 0);
+        for (p = concat(boss_pos, door_boss)) translate(p) circle(d = boss_d + 1);
+        translate([-500, seam_y - (div_t/2 + fit + 1.7)]) square([1000, 2*(div_t/2 + fit + 1.7)]);
+    }
+}
+
 module lid_assembled() {
     z0 = base_h;    // the lid rests on the rim of the walls
     difference() {
         union() {
-            translate([0, 0, z0]) rrect(out_w, out_h, corner_r, lid_t);
+            translate([0, 0, z0]) linear_extrude(lid_t) half2d(true, 0, fit/2);
             // centring lip that fits inside the enclosure
-            translate([0, 0, z0 - 3])
-            difference() {
-                rrect(in_w - 2*fit, in_h - 2*fit, max(corner_r - wall - fit, 0.5), 3);
-                translate([0, 0, -0.1]) rrect(in_w - 2*fit - 3.2, in_h - 2*fit - 3.2, 0.5, 3.2);
-                for (p = boss_pos) translate([p[0], p[1], -0.1]) cylinder(d = boss_d + 1, h = 3.2);
-            }
+            translate([0, 0, z0 - 3]) lip(true);
             // light box: white walls around the strip, from the lid down to just
             // above the LED rib. Light bounces inside and leaves only through the
             // diffuser, so the LEDs merge into one even bar. Print the lid in white
@@ -631,6 +692,33 @@ module lp_tubes() {
 echo(str("LIGHT PIPES: acrylic rods d", lp_d, " mm: DONE, CHRG, PWR ", lp_len,
          " mm, LOW ", lp_len - pb_leds[0][3], " mm"));
 
+// ---------------- BATTERY DOOR (in assembled position) ----------------
+module door_assembled() {
+    z0 = base_h;
+    difference() {
+        union() {
+            translate([0, 0, z0]) linear_extrude(lid_t) half2d(false, 0, fit/2);
+            translate([0, 0, z0 - 3]) lip(false);
+            // ribs that keep the pack in its cradle (1 mm above it)
+            if (door_ribs) for (sx = [-1, 1])
+                translate([pack_x + sx*pack_dx/4 - 0.8, pack_y - pack_dy/2 + 6, floor_t + pack_t + 1])
+                    cube([1.6, pack_dy - 12, z0 - floor_t - pack_t - 1 + 0.5]);
+        }
+        for (p = door_boss) translate([p[0], p[1], z0 - 0.1]) {
+            cylinder(d = lid_screw_d, h = lid_t + 0.2);
+            translate([0, 0, lid_t - lid_head_h + 0.1])
+                cylinder(d1 = lid_screw_d, d2 = lid_head_d, h = lid_head_h);
+        }
+        if (door_icon) translate([0, bay_yc, z0 + lid_t - 0.6]) linear_extrude(1) {
+            difference() { square([26, 13], center = true); square([22.4, 9.4], center = true); }
+            translate([13, 0]) square([3, 5], center = true);
+        }
+    }
+}
+module door_print() {
+    rotate([180, 0, 0]) translate([0, 0, -(base_h + lid_t)]) door_assembled();
+}
+
 // lid rotated for printing: visible face on the bed
 module lid_print() {
     rotate([180, 0, 0]) translate([0, 0, -(base_h + lid_t)]) lid_assembled();
@@ -666,15 +754,19 @@ if (part == "diffuser") diffuser();
 if (part == "separator") separator();
 if (part == "logo_chip" && logo_mode == "inlay") logo_part_print("chip");
 if (part == "logo_wifi" && logo_mode == "inlay") logo_part_print("wifi");
+echo(str("ENCLOSURE: ", out_w, " x ", out_h, " x ", base_h + lid_t,
+         " mm; side opening centre ", in_h/2 + wall - psu_y1, " mm below the top edge"));
 echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm")
      : diff_type == "plug" ? "printed plug flush with the lid, part = diffuser (white PETG)" : "printed, part = diffuser"));
 if (part == "lid230") psu_lid();
+if (part == "door") door_print();
 if (part == "all") {
     base();
     color("OrangeRed") translate([psu_x0, psu_y0 + fit, psu_ztop + 8]) psu_lid();
     if (use_separator)   // resting on the pack, under the board
-        color("Gold") translate([board_x, board_y, floor_t + pack_t + 1.5]) separator();
+        color("Gold") translate([board_x, board_y, floor_t + standoff_h - sep_t - 0.5]) separator();
     color("SteelBlue", 0.6) translate([0, 0, 25]) lid_assembled();
+    color("SlateGray", 0.6) translate([0, 0, 25]) door_assembled();
     if (logo_mode != "none") translate([0, 0, 25 + base_h + lid_t - logo_depth]) {
         color("#0B3A82") logo_solid("chip", logo_depth);
         color("#1F9BD7") logo_solid("wifi", logo_depth);

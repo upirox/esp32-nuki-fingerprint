@@ -3,8 +3,9 @@
 #  Unlocking happens locally on the ESP32: it keeps working even when
 #  Home Assistant or the Wi-Fi are down.
 #  Tested with ESPHome 2026.10.1 and the nuki_lock component main branch
-#  (uriyacovy/ESPHome_nuki_lock, merge bb62014: libsodium fix, pairing RNG fix,
-#  automatic migration of the pairing from older releases).
+#  (uriyacovy/ESPHome_nuki_lock, merge 353cf75: libsodium fix, pairing RNG fix,
+#  automatic migration of the pairing from older releases, immediate state
+#  update after lock actions, GATT services cached in flash).
 #  Wiring:
 #   R503  red VCC     -> 3V3      OLED 7 pin (SPI)
 #         white 3.3VT -> 3V3        GND      -> GND

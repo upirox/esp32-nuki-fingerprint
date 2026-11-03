@@ -21,6 +21,8 @@
 //  check the holes against the real parts.
 // ============================================================
 
+use <oxid_logo.scad>
+
 /* [Plate] */
 plate_w      = 120;   // width
 plate_h      = 85;    // height (covers the unplastered edge around the box)
@@ -28,9 +30,9 @@ plate_t      = 3.5;   // thickness (the R503 nut clamps up to ~10 mm)
 corner_r     = 5;     // corner radius
 edge_chamfer = 0.8;   // front edge chamfer
 
-/* [Logo (chip + Wi-Fi), engraved on the front, bottom-right] */
+/* [OXID icon, engraved on the front, bottom-right] */
 pl_logo       = true;
-pl_logo_size  = 14;    // width (mm): below ~12 the 0.7 mm strokes get lost
+pl_logo_size  = 16;    // width (mm); simplified chip (no pins): strokes >= 0.65 mm
 pl_logo_x     = 45;    // centre, seen from the street
 pl_logo_y     = -31;
 pl_logo_depth = 0.6;   // engraving depth (fill with paint, or leave it plain)
@@ -434,7 +436,7 @@ difference() {
 
     // small logo, engraved on the front face
     if (pl_logo) translate([pl_logo_x, pl_logo_y, -0.01])
-        linear_extrude(pl_logo_depth + 0.01) logo_2d("all");
+        linear_extrude(pl_logo_depth + 0.01) oxid_icon_2d(pl_logo_size, simple = true);
 
     translate([r503_x, r503_y, -0.01]) cylinder(d = r503_hole_d, h = plate_t + 0.02);
     translate([pir_x,  pir_y,  -0.01]) cylinder(d = pir_hole_d,  h = plate_t + 0.02);
@@ -449,6 +451,12 @@ if (use_ms) microswitch_fin();
 if (use_rj45) rj45_posts();
 }
 
+// All x positions in this file are "seen from the street". The front face is
+// at z = 0 and the back towards +z, so the street looks at the plate from -z,
+// where +x would appear on the LEFT: mirror everything on x, so that the
+// printed plate matches the layout as seen from the street (and the logo
+// reads the right way).
+mirror([1, 0, 0]) {
 if (part == "plate" || part == "all") plate();
 if (screw_caps && part == "screw_cap") screw_cap();
 if (screw_caps && part == "all") for (sx = [-1, 1])
@@ -458,41 +466,10 @@ if (use_rj45 && part == "all") rj45_preview();
 if (seal == "tpu" && (part == "gasket" || part == "all")) color("DimGray") gasket();
 if (seal == "cord" && part == "all") color("Black") cord_preview();
 if (use_ms && part == "all") microswitch_preview();
+}
 echo(str("MICROSWITCH: body from ", ms_z0 - plate_t, " to ", ms_z0 + ms_L - plate_t,
          " mm behind the plate, terminals to ", ms_z0 + ms_L + 8 - plate_t,
          " (box depth ", box_depth, "). Lever cut to ", ms_lever_over, " mm beyond the body."));
-
-// ---------------- LOGO ----------------
-// Chip with Wi-Fi waves, from the upirox logo (SVG viewBox 120 x 120, y down).
-function lg(p) = [(p[0] - 60) * pl_logo_size / 120, (60 - p[1]) * pl_logo_size / 120];
-module lg_line(a, b, w) {   // stroke with round caps
-    hull() for (p = [a, b]) translate(lg(p)) circle(d = w * pl_logo_size / 120, $fn = 24);
-}
-module lg_arc(r, w) {       // Wi-Fi wave centred on the dot, 45..135 degrees
-    k = pl_logo_size / 120;
-    for (i = [0:17]) hull() for (a = [45 + i*5, 50 + i*5])
-        translate(lg([60 + r*cos(a), 72 - r*sin(a)])) circle(d = w * k, $fn = 20);
-}
-module logo_2d(which) {
-    k = pl_logo_size / 120;
-    if (which == "chip" || which == "all") {
-        // body: 64 x 64 rounded square, 7 wide stroke
-        difference() {
-            offset(r = (12 + 3.5) * k) square((64 - 24) * k, center = true);
-            offset(r = (12 - 3.5) * k) square((64 - 24) * k, center = true);
-        }
-        // pins
-        for (v = [44, 60, 76]) {
-            lg_line([12, v], [26, v], 6);  lg_line([94, v], [108, v], 6);
-            lg_line([v, 12], [v, 26], 6);  lg_line([v, 94], [v, 108], 6);
-        }
-    }
-    if (which == "wifi" || which == "all") {
-        lg_arc(24, 6);
-        lg_arc(14, 6);
-        translate(lg([60, 72])) circle(r = 5 * k, $fn = 32);
-    }
-}
 
 // The front face is the one on the print bed (z = 0):
 // print it like this, no supports. The back faces up.

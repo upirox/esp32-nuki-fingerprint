@@ -64,20 +64,22 @@
 //  market are not all the same.
 // ============================================================
 
-/* [Part to export] */
-part = "all";            // "base", "lid", "door", "lid230", "diffuser", "logo_chip", "logo_wifi", "all"
+use <oxid_logo.scad>
 
-/* [Logo on the lid (chip + Wi-Fi symbol)] */
-// "engrave": recessed symbol, fill it with paint (chip blue, Wi-Fi light blue)
-// "inlay":   same recess plus two extra STLs ("logo_chip", "logo_wifi") that fill
+/* [Part to export] */
+part = "all";            // "base", "lid", "door", "lid230", "diffuser", "logo_dark", "logo_accent", "all"
+
+/* [Logo on the lid: OXID wordmark, two colours] */
+// "engrave": recessed wordmark, paint it: O, I, D navy, X + chip + dot blue
+// "inlay":   same recess plus two extra STLs ("logo_dark", "logo_accent") that fill
 //            it exactly, for a multi-material printer (AMS / MMU): load lid + both
 //            logo parts as ONE multi-part object, keep their positions, assign colours
-//            (chip #0B3A82 blue, Wi-Fi #1F9BD7 light blue)
+//            (dark #0F1E3D navy, accent #1F8BF5 blue). Best on a white / light grey lid.
 // "none":    plain lid
-logo_mode  = "engrave";
-logo_size  = 56;     // symbol width (mm)
-logo_x     = 0;      // symbol centre on the lid, seen from the room
-logo_y     = -5;
+logo_mode  = "inlay";
+logo_size  = 90;     // wordmark width (mm), height = 0.294 x width
+logo_x     = 0;      // wordmark centre on the lid, seen from the room
+logo_y     = -22;    // below the PowerBoost light pipes
 logo_depth = 0.8;    // engraving depth (lid is lid_t thick)
 
 /* [Enclosure] */
@@ -652,39 +654,9 @@ module lightbox() {
     }
 }
 
-// ---------------- LOGO ----------------
-// Chip with Wi-Fi waves, from the upirox logo (SVG viewBox 120 x 120, y down).
-function lg(p) = [(p[0] - 60) * logo_size / 120, (60 - p[1]) * logo_size / 120];
-module lg_line(a, b, w) {   // stroke with round caps
-    hull() for (p = [a, b]) translate(lg(p)) circle(d = w * logo_size / 120, $fn = 24);
-}
-module lg_arc(r, w) {       // Wi-Fi wave centred on the dot, 45..135 degrees
-    k = logo_size / 120;
-    for (i = [0:17]) hull() for (a = [45 + i*5, 50 + i*5])
-        translate(lg([60 + r*cos(a), 72 - r*sin(a)])) circle(d = w * k, $fn = 20);
-}
-module logo_2d(which) {
-    k = logo_size / 120;
-    if (which == "chip" || which == "all") {
-        // body: 64 x 64 rounded square, 7 wide stroke
-        difference() {
-            offset(r = (12 + 3.5) * k) square((64 - 24) * k, center = true);
-            offset(r = (12 - 3.5) * k) square((64 - 24) * k, center = true);
-        }
-        // pins
-        for (v = [44, 60, 76]) {
-            lg_line([12, v], [26, v], 6);  lg_line([94, v], [108, v], 6);
-            lg_line([v, 12], [v, 26], 6);  lg_line([v, 94], [v, 108], 6);
-        }
-    }
-    if (which == "wifi" || which == "all") {
-        lg_arc(24, 6);
-        lg_arc(14, 6);
-        translate(lg([60, 72])) circle(r = 5 * k, $fn = 32);
-    }
-}
+// ---------------- LOGO (oxid_logo.scad) ----------------
 module logo_solid(which, h) {
-    translate([logo_x, logo_y, 0]) linear_extrude(h) logo_2d(which);
+    translate([logo_x, logo_y, 0]) linear_extrude(h) oxid_wordmark_2d(logo_size, which);
 }
 // inlay parts, in the same position as the printed lid (visible face on the bed)
 module logo_part_print(which) {
@@ -780,8 +752,8 @@ if (part == "base") base();
 if (part == "lid") lid_print();
 if (part == "diffuser") diffuser();
 if (part == "separator") separator();
-if (part == "logo_chip" && logo_mode == "inlay") logo_part_print("chip");
-if (part == "logo_wifi" && logo_mode == "inlay") logo_part_print("wifi");
+if (part == "logo_dark" && logo_mode == "inlay") logo_part_print("dark");
+if (part == "logo_accent" && logo_mode == "inlay") logo_part_print("accent");
 echo(str("ENCLOSURE: ", out_w, " x ", out_h, " x ", base_h + lid_t,
          " mm; side opening centre ", in_h/2 + wall - psu_y1, " mm below the top edge"));
 echo(str("DIFFUSER: ", diff_type == "pmma" ? str("opal acrylic bar ", diff_pmma_l, " x ", diff_pmma_w, " x ", diff_t, " mm")
@@ -796,8 +768,8 @@ if (part == "all") {
     color("SteelBlue", 0.6) translate([0, 0, 25]) lid_assembled();
     color("SlateGray", 0.6) translate([0, 0, 25]) door_assembled();
     if (logo_mode != "none") translate([0, 0, 25 + base_h + lid_t - logo_depth]) {
-        color("#0B3A82") logo_solid("chip", logo_depth);
-        color("#1F9BD7") logo_solid("wifi", logo_depth);
+        color("#0F1E3D") logo_solid("dark", logo_depth);
+        color("#1F8BF5") logo_solid("accent", logo_depth);
     }
     if (diff_type == "plug")   // in place: front flush with the lid face
         color("White") translate([0, strip_y, 25 + base_h + lid_t]) mirror([0,0,1]) window_plug();

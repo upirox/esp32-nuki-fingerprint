@@ -33,7 +33,9 @@
 #         GPIO19 -> microswitch C -> NO -> reed -> GND   (internal pull-up)
 #         plate mounted = circuit closed; plate removed or wire cut = alarm
 #   Backup power (PowerBoost 1000C + 3 x 18650 in parallel)
-#         mains present: +5V power supply -> 10k -> GPIO36 -> 20k -> GND
+#         mains present: SIG of the power supply PCB -> GPIO36
+#                        (12k / 20k divider on that PCB: 5 V -> 3.1 V;
+#                        hand-wired: +5V -> 10k -> GPIO36 -> 20k -> GND)
 #         battery:       PowerBoost BAT   -> 100k -> GPIO39 -> 100k -> GND
 #                                            (+ 100 nF between GPIO39 and GND)
 #         During a blackout: strip at 30%, push button ring off while idle
@@ -967,7 +969,7 @@ binary_sensor:
     id: mains_ok
     name: Mains Power
     device_class: power
-    pin: GPIO36                      # input only, pull-down = external 20k resistor
+    pin: GPIO36                      # input only, pull-down = the 20k resistor of the divider
     filters:
       - delayed_on: 2s
       - delayed_off: 2s

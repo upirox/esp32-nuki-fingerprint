@@ -21,7 +21,7 @@
 //
 //  Box position: right wall of the box "gap" mm from the left edge of the
 //  plate, TOP edge of the box box_top_y mm above the plate centre, so that
-//  its side opening is centred on the plate (default: 107.4 mm above; the
+//  its side opening is centred on the plate (default: 100.4 mm above; the
 //  ENCLOSURE line in the console of the box file gives the same number).
 //
 //  Coordinates: x to the right (x = 0 at the left edge of the plate),
@@ -65,7 +65,7 @@ mod_w    = win_w/3; // window modules, from the left: pre-drilled blank,
 box_out_w = 144.8;
 box_out_h = 233.2;
 box_out_d = 35.6;
-box_top_y = 107.4;  // top edge of the box above the side opening centre
+box_top_y = 100.4;  // top edge of the box above the side opening centre
 
 $fn = 48;
 

@@ -232,7 +232,7 @@ pb_leds = [[5.429, 20.861, "LOW", 6], [6.223, 1.143, "DONE", 0], [9.779, 1.143, 
 /* [230 V power supply bay (at the bottom, full width between the columns)] */
 psu_x0     = -54;   // left wall of the bay (left of it: corridor for the battery wires)
 psu_x1     = 60;    // right wall
-psu_y1     = -25;   // top wall (below it is the outer wall of the enclosure)
+psu_y1     = -18;   // top wall (bay inside 58 mm tall: the 56 mm supply board + 1 mm per side)
 psu_wall   = 2;
 psu_top    = 3.5;   // the bay ends 3.5 mm below the rim (cover top 1.5 mm below the lid)
 psu_comp_h = 21.5;  // tallest part on the supply board (IRM-10-5: 21.5 mm)
@@ -241,22 +241,29 @@ mod_l      = 46;    // Mean Well IRM-10-5: 45.7 x 25.4 x 21.5 (other module: mea
 mod_w      = 25.5;
 mod_x      = -20;   // module centre
 mod_y      = -50;
-// Power supply board (perfboard 80 x 40, 2 mm holes at 76 x 36) instead of
-// the cradle: IRM-10-5 + input screw terminal, fuse holder, varistor,
-// output capacitors and output screw terminal, all soldered on the board.
+// Power supply PCB "alimentatore_5v_sense" v1.0 (KiCad, 75 x 56 mm, 4 M3 holes
+// at 67 x 49): IRM-10-5, J1 230 V input, fuse, varistor, output capacitors,
+// mains sense divider (12k / 20k) and J2 output (+5V, GND, SIG).
+// Mounted ROTATED 180 degrees compared with the KiCad drawing: the 230 V
+// zone (J1) is on the RIGHT, close to the mains cable entry and the cable
+// tie, and the output J2 is on the LEFT, close to the hole of the wires to
+// the ESP32 board. The mains cable never crosses the low voltage side.
+// Cut the leads under the board to 2 mm at most (230 V tracks underneath).
 use_psu_board = true;  // false = bare module glued in the cradle
-pcb_l      = 80;
-pcb_w      = 40;
-pcb_x      = 1;      // board centre: input end on the right (230 V entry),
-pcb_y      = (-in_h/2 + 2.5 + psu_y1 - 2)/2; // centred in the bay; output end on the left (5 V hole)
-pcb_hole_in= 2;      // hole centres 2 mm from the edges: 76 x 36 spacing
-pcb_pilot_d= 1.7;    // 2 mm board holes: M2 self-tapping screws (M2 x 6-8)
-pcb_post_d = 6;
+pcb_l      = 75;
+pcb_w      = 56;
+pcb_x      = 3;      // board centre: 17.5 mm free on both sides for the wires
+pcb_y      = (-in_h/2 + 2 + psu_y1 - psu_wall)/2;   // centred in the bay
+pcb_hole_dx= 67;     // M3 hole spacing (KiCad H1-H4)
+pcb_hole_dy= 49;
+pcb_insert_d = 4.0;  // M3 heat-set insert, SHORT type (3-4 mm long): the post
+pcb_insert_l = 4.2;  //   is only 3 mm + the 3 mm back. Nylon M3 x 6 screws.
+pcb_post_d = 7;
 pcb_post_h = 3;      // board height above the floor (room for the solder joints)
 use_gland  = false; // OLD layout only (bay against the bottom wall): mains cable gland
 gland_x    = 35;
 gland_d    = 16.2;  // M16 gland (cable 4.5-10 mm, e.g. 3G1.5); 12.6 for M12
-out_hole_d = 6;     // 5 V wires to the board (top wall of the bay)
+out_hole_d = 6;     // +5V, GND, SIG wires to the ESP32 board (top wall of the bay)
 out_hole_x = -40;
 
 /* [Antenna (top wall)] */
@@ -321,7 +328,7 @@ win_w = strip_len - 4;
 // OpenSCAD would report "not a valid 2-manifold"
 boss_pos = [for (sx=[-1,1], sy=[-1,1]) [sx*(in_w/2 - boss_d/2 + 0.5), sy*(in_h/2 - boss_d/2 + 0.5)]];
 psu_y0   = div_y1;
-pcb_posts = [for (sx = [-1,1], sy = [-1,1]) [pcb_x + sx*(pcb_l/2 - pcb_hole_in), pcb_y + sy*(pcb_w/2 - pcb_hole_in)]];
+pcb_posts = [for (sx = [-1,1], sy = [-1,1]) [pcb_x + sx*pcb_hole_dx/2, pcb_y + sy*pcb_hole_dy/2]];
 cable_y  = psu_y1 - psu_wall/2;          // hole centred on the wall of the bay
 psu_ztop = floor_t + in_d - psu_top;     // height of the bay walls
 psu_posts = [[psu_x0 + psu_wall + psu_post_d/2 - 0.5, psu_y1 - psu_wall - psu_post_d/2 + 0.5],  // they sink 0.5 mm into the walls
@@ -420,7 +427,11 @@ module base() {
         // holes of the 230 V cover posts
         for (p = psu_posts) screw_hole_in(p, psu_ztop);
         // holes of the supply board posts
-        if (use_psu_board) for (p = pcb_posts) translate([p[0], p[1], floor_t + 1]) cylinder(d = pcb_pilot_d, h = pcb_post_h);
+        if (use_psu_board) for (p = pcb_posts)
+            translate([p[0], p[1], floor_t + pcb_post_h - pcb_insert_l]) {
+                cylinder(d = pcb_insert_d, h = pcb_insert_l + 0.1);
+                translate([0, 0, pcb_insert_l - 0.5]) cylinder(d1 = pcb_insert_d, d2 = pcb_insert_d + 0.8, h = 0.61);
+            }
         // 5 V wires from the bay to the board (top wall of the bay)
         translate([out_hole_x, psu_y1 + 1, floor_t + 6])
             rotate([90, 0, 0]) cylinder(d = out_hole_d, h = psu_wall + 2);
@@ -429,7 +440,7 @@ module base() {
             rotate([-90, 0, 0]) cylinder(d = ant_d, h = wall + 2);
         // vent slots on the left and right walls: low inlets, high outlets
         if (vents) for (sx = [-1,1], y = concat(
-                [for (i = [0:vent_low_n-1])  psu_y1 + 4 + i*vent_pitch],
+                [for (i = [0:vent_low_n-1])  psu_y1 + 14 + i*vent_pitch],   // above the side opening
                 [for (i = [0:vent_high_n-1]) vent_high_y0 + i*vent_pitch]))
             translate([sx*(in_w/2 + wall/2), y, floor_t + in_d/2])
                 cube([wall + 2, vent_w, vent_l], center = true);

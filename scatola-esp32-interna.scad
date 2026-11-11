@@ -420,6 +420,9 @@ module base() {
             cylinder(d = wall_screw_d, h = floor_t + 0.2);
             translate([0, 0, floor_t - 2.4 + 0.1])
                 cylinder(d1 = wall_screw_d, d2 = wall_head_d, h = 2.4);
+            // the cut goes on well above the floor: without it the slicer saw a
+            // zero-thickness ring at the floor level ("floating cantilever")
+            translate([0, 0, floor_t]) cylinder(d = wall_head_d, h = 2);
         }
         // mains cable gland (bottom wall, inside the bay)
         if (use_gland) translate([gland_x, -in_h/2 + psu_wall + 1, floor_t + 12])
@@ -480,9 +483,10 @@ module led_rib() {
         translate([-strip_len/2 + 1.6, -w/2 + 1.6, floor_t]) cube([strip_len - 3.2, w - 3.2, top - floor_t - 1.6]);
     }
     // small rails that keep the strip straight
-    translate([0, strip_y, top])
+    // (they sink 0.1 mm into the rib: resting exactly on it left internal faces)
+    translate([0, strip_y, top - 0.1])
         for (sy = [-1,1]) translate([-strip_len/2, sy*(strip_w/2 + 0.6) - 0.6, 0])
-            cube([strip_len, 1.2, 1.2]);
+            cube([strip_len, 1.2, 1.3]);
 }
 
 // battery pack cradle in the battery bay (long side horizontal if pack_horizontal).

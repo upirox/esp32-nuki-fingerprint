@@ -31,7 +31,7 @@ Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nu
 | `copricavo-anteprima.png` | Front view and section of the cable cover. |
 | `placca-anteprima.png` | Layout of the outdoor plate, front and back. |
 | `scatola-esp32-anteprima.png` | Layout preview of the indoor enclosure. |
-| `coperchio-logo-anteprima.png` | Lid with the OXID wordmark as a two-colour inlay (`logo_mode`: "inlay" with the `logo_dark` / `logo_accent` parts for a multi-material printer, or "engrave" and paint). |
+| `coperchio-logo-anteprima.png` | Lid with the OXID wordmark as a two-colour inlay (`logo_mode`: "inlay" with the `logo_dark` / `logo_accent` parts for a multi-material printer, or "engrave" and paint). On a black lid print `logo_dark` in white; the light box walls are a separate `lightbox` part to print in white. |
 | `oxid_logo.scad` | OXID logo in OpenSCAD (wordmark and icon, 2D), used by the lid and the plate. |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `plate-connector-rj45.png` | Wiring of the two RJ45 connectors between the outdoor plate and the ESP32. |

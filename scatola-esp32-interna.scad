@@ -67,14 +67,16 @@
 use <oxid_logo.scad>
 
 /* [Part to export] */
-part = "all";            // "base", "lid", "door", "lid230", "diffuser", "logo_dark", "logo_accent", "all"
+part = "all";            // "base", "lid", "lightbox", "door", "lid230", "diffuser", "logo_dark", "logo_accent", "all"
 
 /* [Logo on the lid: OXID wordmark, two colours] */
 // "engrave": recessed wordmark, paint it: O, I, D navy, X + chip + dot blue
 // "inlay":   same recess plus two extra STLs ("logo_dark", "logo_accent") that fill
 //            it exactly, for a multi-material printer (AMS / MMU): load lid + both
 //            logo parts as ONE multi-part object, keep their positions, assign colours
-//            (dark #0F1E3D navy, accent #1F8BF5 blue). Best on a white / light grey lid.
+//            Light lid (white / light grey): logo_dark navy #0F1E3D, logo_accent blue #1F8BF5.
+//            BLACK lid: logo_dark WHITE (or light grey), logo_accent blue (a light,
+//            bright blue reads better on black). The part names stay the same.
 // "none":    plain lid
 logo_mode  = "inlay";
 logo_size  = 90;     // wordmark width (mm), height = 0.294 x width
@@ -160,6 +162,12 @@ plug_flange_t = 1.2; // plug: flange thickness (glued to the inside of the lid)
 diff_t     = 2;      // diffuser thickness: 2 mm opal PMMA (printed: 1.6)
 diff_margin= 2;      // diffuser ledge around the window
 use_lightbox = true; // walls around the strip, hanging from the lid
+// Light box walls as a SEPARATE part (part = "lightbox"), for a multi-material
+// print: lid in a dark colour, light box in WHITE (white walls reflect the
+// light and the 12 LEDs merge into one even bar; black walls would absorb
+// it). Load lid + lightbox (+ logo parts) as ONE object with several parts.
+// false: the walls are part of the lid, same colour.
+lightbox_part = true;
 box_wall   = 1.2;    // light box wall thickness
 box_clear  = 0.5;    // gap between the light box walls and the rib
 box_wire_w = 7;      // notches at the ends of the light box for the strip wires
@@ -614,7 +622,7 @@ module lid_assembled() {
             // above the LED rib. Light bounces inside and leaves only through the
             // diffuser, so the LEDs merge into one even bar. Print the lid in white
             // or line the inside of the box with white paint / aluminium tape.
-            if (use_lightbox) lightbox();
+            if (use_lightbox && !lightbox_part) lightbox();
             // tubes guiding the PowerBoost light pipes
             if (use_lightpipes) lp_tubes();
             // ring that holds the buzzer
@@ -654,14 +662,14 @@ module lid_assembled() {
     }
 }
 
-module lightbox() {
+module lightbox(sep = false) {     // sep: separate part, it stops at the lid
     h  = base_h - rib_top - box_clear;                // from the lid down to the rib
     iw = box_iw;                                      // inside: the rib + rails fit in
     ih = box_ih;
     translate([0, strip_y, base_h - h])
     difference() {
         // +0.5 mm into the lid, so the union is a clean solid
-        translate([-iw/2 - box_wall, -ih/2 - box_wall, 0]) cube([iw + 2*box_wall, ih + 2*box_wall, h + 0.5]);
+        translate([-iw/2 - box_wall, -ih/2 - box_wall, 0]) cube([iw + 2*box_wall, ih + 2*box_wall, h + (sep ? 0 : 0.5)]);
         translate([-iw/2, -ih/2, -0.1]) cube([iw, ih, h + 0.7]);
         // wire notches at both ends (the strip can face either way)
         for (sx = [-1, 1]) translate([sx*(iw/2 + box_wall/2) - box_wall, -box_wire_w/2, -0.1])
@@ -765,6 +773,9 @@ module diffuser() {
 // ------------------------------------------------------------
 if (part == "base") base();
 if (part == "lid") lid_print();
+// light box in the same position as the printed lid (visible face on the bed)
+if (part == "lightbox" && use_lightbox && lightbox_part)
+    rotate([180, 0, 0]) translate([0, 0, -(base_h + lid_t)]) lightbox(true);
 if (part == "diffuser") diffuser();
 if (part == "separator") separator();
 if (part == "logo_dark" && logo_mode == "inlay") logo_part_print("dark");
@@ -781,6 +792,7 @@ if (part == "all") {
     if (use_separator)   // resting on the pack, under the board
         color("Gold") translate([board_x, board_y, floor_t + standoff_h - sep_t - 0.5]) separator();
     color("SteelBlue", 0.6) translate([0, 0, 25]) lid_assembled();
+    if (use_lightbox && lightbox_part) color("White") translate([0, 0, 25]) lightbox(true);
     color("SlateGray", 0.6) translate([0, 0, 25]) door_assembled();
     if (logo_mode != "none") translate([0, 0, 25 + base_h + lid_t - logo_depth]) {
         color("#0F1E3D") logo_solid("dark", logo_depth);

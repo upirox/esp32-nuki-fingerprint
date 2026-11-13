@@ -560,6 +560,10 @@ module pb_cradle() {
             // short sides open for wires, JST and micro-USB connectors
             for (sx = [-1,1]) translate([sx*((pb_l + 2*c)/2 + t/2), 0, pb_feet_h - 0.5 + h/2])
                 cube([t + 0.4, pb_w - 6, h], center = true);
+            // bottom long side open along the row of pads (5Vo, GND, LBO, GND, EN,
+            // Vsh, LiPo, USB): the wires soldered there leave towards the bottom
+            translate([-pb_l/2 + 10.5, -(pb_w + 2*c)/2 - t - 0.1, pb_feet_h - 1.5])
+                cube([22.5, t + 0.2, h]);
         }
         // posts with pins under the two mounting holes (micro-USB end)
         for (p = pb_holes) translate([-pb_l/2 + p[0], -pb_w/2 + p[1], -0.1]) {
@@ -568,7 +572,7 @@ module pb_cradle() {
         }
         // pads under the other end
         for (sy = [-1,1])
-            translate([pb_l/2 - 2.2, sy*(pb_w/2 - 2.5), -0.1]) cylinder(d = 3.5, h = pb_feet_h + 0.1);
+            translate([pb_l/2 - 1.9, sy*(pb_w/2 - 2.5), -0.1]) cylinder(d = 3.5, h = pb_feet_h + 0.1);
     }
 }
 

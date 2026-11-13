@@ -38,7 +38,8 @@
 //
 //  Lid and battery door: held by 12 hidden 8 x 2 mm magnets (lid_fix), no
 //          screws on the front. 230 V cover: 2 x M3 x 6 into 2 brass M3
-//          heat-set inserts (soldering iron tip at
+//          heat-set inserts. Power supply board: 4 x M3 x 6 straight into
+//          its posts. PowerBoost: on two printed pins (melt the tips). (soldering iron tip at
 //          ~220-240 C for PETG, keep the insert straight, don't force it),
 //          4 x 4 mm screws + wall plugs for the wall.
 //  Material: PETG or ASA (NOT PLA: there is a 230 V power supply inside).
@@ -195,7 +196,10 @@ pack_w     = 58;    // short side (3 cells side by side)
 pack_horizontal = true; // long side horizontal, in the battery bay
 pack_t     = 19.5;  // thickness
 pack_wall_h= 8;     // cradle height (a velcro strap holds the rest)
-strap_w    = 16;    // slots for the strap that holds the pack
+strap_w    = 16;    // strap width (velcro strap or two cable ties)
+strap_gap  = 3;     // the strap goes UNDER two small bridges next to the cradle,
+strap_bar  = 2.4;   //   inside the bay: nothing passes behind the enclosure, the
+                    //   back stays flat against the wall
 
 /* [Battery bay (bottom) and its door] */
 div_t      = 3;     // wall between the main part and the battery bay (lid and
@@ -210,10 +214,21 @@ door_ribs  = true;  // ribs on the inside of the door, 1 mm above the pack:
 door_icon  = true;  // battery symbol engraved on the door
 
 /* [PowerBoost 1000C (without the USB-A socket)] */
-pb_l       = 36.2;
+pb_l       = 36.1;   // board 36.07 x 22.86 (Adafruit Eagle file, Rev B)
 pb_w       = 22.9;
 pb_x       = 44;
 pb_y       = 22;
+// The board has only TWO mounting holes (2.5 mm), both at the micro-USB end.
+// Screw heads would hit the LOW LED and the DONE light pipe next to them, so
+// the board drops onto two printed PINS: melt their tips with the soldering
+// iron (like the OLED pins on the plate) or add a drop of glue. The other end
+// rests on two pads and is kept down by a post hanging from the lid.
+pb_holes   = [[2.54, 2.54], [2.54, 20.32]];   // from the micro-USB / pad-row corner
+pb_feet_h  = 3;      // board height above the floor (air underneath)
+pb_pin_d   = 2.3;
+pb_pin_over= 1.5;    // pin above the board, to be melted flat
+pb_holddown= [31.1, 17.4];  // free spot on the board (next to the "-" mark)
+                            // where the lid post ends 0.4 mm above it
 // Mount the board with the micro-USB towards the ESP32 (left) and the row of
 // pads (USB, Bat, Vs, EN, GND, 5V) at the bottom: the light pipes line up with
 // its LEDs only this way.
@@ -264,8 +279,14 @@ pcb_x      = 3;      // board centre: 17.5 mm free on both sides for the wires
 pcb_y      = (-in_h/2 + 2 + psu_y1 - psu_wall)/2;   // centred in the bay
 pcb_hole_dx= 67;     // M3 hole spacing (KiCad H1-H4)
 pcb_hole_dy= 49;
-pcb_insert_d = 4.0;  // M3 heat-set insert, SHORT type (3-4 mm long): the post
-pcb_insert_l = 4.2;  //   is only 3 mm + the 3 mm back. Nylon M3 x 6 screws.
+// "selftap": 2.5 mm pilot holes, M3 x 6 screws straight into the plastic
+//            (self-tapping for plastic, or normal M3 machine screws: they cut
+//            their own thread in PETG). 5 mm deep, closed at the back.
+// "insert":  pockets for SHORT M3 heat-set inserts (3-4 mm), nylon M3 x 6 screws
+pcb_fix      = "selftap";
+pcb_pilot_d  = 2.5;
+pcb_insert_d = 4.0;
+pcb_insert_l = 4.2;
 pcb_post_d = 7;
 pcb_post_h = 3;      // board height above the floor (room for the solder joints)
 use_gland  = false; // OLD layout only (bay against the bottom wall): mains cable gland
@@ -385,6 +406,7 @@ module base() {
             led_rib();
             psu_bay();
             pack_cradle();
+            strap_loops();
             pb_cradle();
         }
         // lid screw holes (heat-set inserts or self-tapping screws)
@@ -419,10 +441,6 @@ module base() {
             translate([cable_x, cable_y, -0.1]) cylinder(d = cable_d, h = floor_t + 0.2);
             translate([cable_x - cable_d, psu_y1 - psu_wall - 0.1, -1]) cube([2*cable_d, psu_wall + 0.2, floor_t + 2]);
         }
-        // slots for the battery pack strap
-        for (sx = [-1,1])
-            translate([pack_x + sx*(pack_dx/2 + 4.5), pack_y, -0.1])
-                linear_extrude(floor_t + 0.2) offset(1) square([1.2, strap_w - 2], center = true);
         // wall screw holes (countersunk from the inside)
         for (p = wall_holes) translate([p[0], p[1], -0.1]) {
             cylinder(d = wall_screw_d, h = floor_t + 0.2);
@@ -438,11 +456,15 @@ module base() {
         // holes of the 230 V cover posts
         for (p = psu_posts) screw_hole_in(p, psu_ztop);
         // holes of the supply board posts
-        if (use_psu_board) for (p = pcb_posts)
-            translate([p[0], p[1], floor_t + pcb_post_h - pcb_insert_l]) {
-                cylinder(d = pcb_insert_d, h = pcb_insert_l + 0.1);
-                translate([0, 0, pcb_insert_l - 0.5]) cylinder(d1 = pcb_insert_d, d2 = pcb_insert_d + 0.8, h = 0.61);
-            }
+        if (use_psu_board) for (p = pcb_posts) {
+            if (pcb_fix == "insert")
+                translate([p[0], p[1], floor_t + pcb_post_h - pcb_insert_l]) {
+                    cylinder(d = pcb_insert_d, h = pcb_insert_l + 0.1);
+                    translate([0, 0, pcb_insert_l - 0.5]) cylinder(d1 = pcb_insert_d, d2 = pcb_insert_d + 0.8, h = 0.61);
+                }
+            else   // pilot hole, 1 mm of back left closed
+                translate([p[0], p[1], 1]) cylinder(d = pcb_pilot_d, h = floor_t + pcb_post_h, $fn = 24);
+        }
         // 5 V wires from the bay to the board (top wall of the bay)
         translate([out_hole_x, psu_y1 + 1, floor_t + 6])
             rotate([90, 0, 0]) cylinder(d = out_hole_d, h = psu_wall + 2);
@@ -514,9 +536,21 @@ module pack_cradle() {
     }
 }
 
+// two small bridges next to the cradle: the strap passes under them (left
+// bridge -> over the pack -> right bridge). Printed as 18 mm bridges, no supports.
+module strap_loops() {
+    xo = (pack_dx + 1.2)/2 + 1.6 + 0.8;        // just outside the cradle wall
+    L  = strap_w + 2;                          // tunnel width
+    for (sx = [-1,1]) translate([pack_x + sx*(xo + 2), pack_y, floor_t - 0.1]) {
+        for (sy = [-1,1]) translate([-2, sy*(L/2 + 1) - 1, 0])
+            cube([4, 2, strap_gap + strap_bar + 0.1]);
+        translate([-2, -L/2 - 2, strap_gap + 0.1]) cube([4, L + 4, strap_bar]);
+    }
+}
+
 // PowerBoost cradle on small feet (air flows underneath: it gets warm while charging)
 module pb_cradle() {
-    c = 0.4; t = 1.2; h = 5;
+    c = 0.4; t = 1.2; h = pb_feet_h + 3;
     translate([pb_x, pb_y, floor_t]) {
         difference() {
             translate([-(pb_l + 2*c)/2 - t, -(pb_w + 2*c)/2 - t, 0])
@@ -524,12 +558,17 @@ module pb_cradle() {
             translate([-(pb_l + 2*c)/2, -(pb_w + 2*c)/2, -0.1])
                 cube([pb_l + 2*c, pb_w + 2*c, h + 0.2]);
             // short sides open for wires, JST and micro-USB connectors
-            for (sx = [-1,1]) translate([sx*((pb_l + 2*c)/2 + t/2), 0, h/2 + 1.5])
+            for (sx = [-1,1]) translate([sx*((pb_l + 2*c)/2 + t/2), 0, pb_feet_h - 0.5 + h/2])
                 cube([t + 0.4, pb_w - 6, h], center = true);
         }
-        // feet: the board sits 2 mm above the floor
-        for (sx = [-1,1], sy = [-1,1])
-            translate([sx*(pb_l/2 - 3), sy*(pb_w/2 - 2.5), 0]) cylinder(d = 4, h = 2);
+        // posts with pins under the two mounting holes (micro-USB end)
+        for (p = pb_holes) translate([-pb_l/2 + p[0], -pb_w/2 + p[1], -0.1]) {
+            cylinder(d = 5, h = pb_feet_h + 0.1);
+            cylinder(d = pb_pin_d, h = pb_feet_h + 1.6 + pb_pin_over + 0.1, $fn = 24);
+        }
+        // pads under the other end
+        for (sy = [-1,1])
+            translate([pb_l/2 - 2.2, sy*(pb_w/2 - 2.5), -0.1]) cylinder(d = 3.5, h = pb_feet_h + 0.1);
     }
 }
 
@@ -625,6 +664,9 @@ module lid_assembled() {
             if (use_lightbox && !lightbox_part) lightbox();
             // tubes guiding the PowerBoost light pipes
             if (use_lightpipes) lp_tubes();
+            // post that keeps the free end of the PowerBoost down
+            translate([pb_x0 + pb_holddown[0], pb_y0 + pb_holddown[1], lp_pcb_top + 0.4])
+                cylinder(d = 3.5, h = base_h - lp_pcb_top - 0.4 + 0.5, $fn = 24);
             // ring that holds the buzzer
             translate([buzz_x, buzz_y, z0 - buzz_ring_h])
             difference() {
@@ -691,7 +733,7 @@ module logo_part_print(which) {
 pb_x0 = pb_x - pb_l/2;                 // board corner on the micro-USB / pads side
 pb_y0 = pb_y - pb_w/2;
 lp_pos = [for (l = pb_leds) [pb_x0 + l[0], pb_y0 + l[1], l[3]]];
-lp_pcb_top = floor_t + 2 + 1.6;        // feet + PCB
+lp_pcb_top = floor_t + pb_feet_h + 1.6; // feet + PCB
 lp_led_top = lp_pcb_top + 0.8;         // + 0805 LED
 lp_div_t   = 0.8;                      // divider between DONE and CHRG
 lp_bot = lp_led_top + lp_led_gap;      // bottom of the tubes and of the rods

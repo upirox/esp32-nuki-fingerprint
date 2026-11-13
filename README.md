@@ -36,7 +36,7 @@ Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nu
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
 | `plate-connector-rj45.png` | Wiring of the two RJ45 connectors between the outdoor plate and the ESP32. |
 | `plate-power-strip.png` | 3V3 / GND distribution strip behind the outdoor plate. |
-| `power schema.pdf` | Backup power wiring: power supply, PowerBoost 1000C, battery and the two voltage dividers. |
+| `power schema.pdf` | Backup power wiring (in Italian): power supply PCB (IRM-10-5, fuse, varistor, mains-sense divider, J1/J2 terminals), PowerBoost 1000C, battery and the battery voltage divider. |
 
 ## Hardware
 

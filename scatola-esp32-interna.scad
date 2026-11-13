@@ -50,8 +50,12 @@
 //
 //  LAYOUT (vertical, outer width < 15 cm):
 //    top      LED status strip (12 LEDs, 83 mm) inside a light box
-//    middle   ESP32 board on the left (USB-C to the right) on low standoffs |
-//             PowerBoost 1000C and buzzer on the right
+//    middle   ESP32 board on the left (USB-C to the right) on low standoffs,
+//             with 15 mm free above and 22 mm below its screw terminals
+//             (ferrules + wire bends). On the right, from the top: PowerBoost
+//             1000C, then 3 Wago 221-412 against the wall, the battery divider
+//             board next to them (buzzer on the lid above it).
+//             Small bridges on the floor take cable ties along the wire runs.
 //    lower    230 V bay with the power supply
 //    bottom   battery bay (3 x 18650 pack lying), behind its own door, split
 //             from the rest by a full-height wall. The battery wires go
@@ -82,12 +86,12 @@ part = "all";            // "base", "lid", "lightbox", "door", "lid230", "diffus
 logo_mode  = "inlay";
 logo_size  = 90;     // wordmark width (mm), height = 0.294 x width
 logo_x     = 0;      // wordmark centre on the lid, seen from the room
-logo_y     = -22;    // below the PowerBoost light pipes
+logo_y     = -45;    // on the lower half of the lid (over the 230 V bay)
 logo_depth = 0.8;    // engraving depth (lid is lid_t thick)
 
 /* [Enclosure] */
 in_w     = 140;   // inner width (outer = +4.8 mm: max 150)
-in_h     = 160;   // inner height of the main part (LED strip, board, 230 V bay)
+in_h     = 184;   // inner height of the main part (LED strip, board, 230 V bay)
 board_headroom = 20;  // min. room above the terminal board (ESP32 + terminals + wires)
                       // inner depth = the largest of board / power supply / pack needs
 wall     = 2.4;   // wall thickness
@@ -125,7 +129,7 @@ lid_head_h   = 1.8;
 
 /* [ESP32 screw terminal board (position = board centre)] */
 board_x       = -26;
-board_y       = 17;
+board_y       = 23.5; // bottom edge 22 mm above the 230 V bay, top edge 15 mm below the light box
 board_w       = 78;   // board + terminals footprint, lying: terminals on the top and
 board_h       = 63;   // bottom sides, USB-C to the right (plug passes over the PowerBoost)
 board_hole_dx = 72;   // mounting hole spacing (MEASURE IT), 3 mm holes
@@ -138,8 +142,8 @@ standoff_pilot= 2.5;  // M3 self-tapping or M2.5 screw
 board_guides  = true; // L-shaped corner guides that centre the board
 
 /* [Indoor buzzer (32.5 x 13 module, fixed to the lid)] */
-buzz_x        = 40;
-buzz_y        = 42;
+buzz_x        = 36;   // on the lid, over the battery divider board
+buzz_y        = 22;
 buzz_d        = 12;
 buzz_ring_h   = 6;
 buzz_ring_w   = 1.2;
@@ -149,7 +153,7 @@ sound_hole_d  = 1.6;
 led_n      = 12;
 led_pitch  = 1000/144; // 144 LEDs/m = 6.94 mm (8 LEDs/80 mm strip: 10) | length = led_n x led_pitch
 strip_w    = 12.6;   // strip width (12 mm PCB) + clearance
-strip_y    = 68;     // strip position (centre, at the top)
+strip_y    = 80;     // strip position (centre, at the top)
 led_gap    = 12;     // LED to diffuser distance: >= 1.5 x led_pitch for an even bar
 win_h      = 6;      // height of the light window
 diff_type  = "plug"; // "plug": printed plug flush with the lid face (white PETG)
@@ -216,8 +220,8 @@ door_icon  = true;  // battery symbol engraved on the door
 /* [PowerBoost 1000C (without the USB-A socket)] */
 pb_l       = 36.1;   // board 36.07 x 22.86 (Adafruit Eagle file, Rev B)
 pb_w       = 22.9;
-pb_x       = 44;
-pb_y       = 22;
+pb_x       = 46;    // top right, next to the light box
+pb_y       = 55;
 // The board has only TWO mounting holes (2.5 mm), both at the micro-USB end.
 // Screw heads would hit the LOW LED and the DONE light pipe next to them, so
 // the board drops onto two printed PINS: melt their tips with the soldering
@@ -242,8 +246,9 @@ pb_holddown= [31.1, 17.4];  // free spot on the board (next to the "-" mark)
 // keep the LED end polished.
 use_lightpipes = true;
 lp_d        = 2;      // rod diameter (2 mm acrylic rod)
-lp_hole     = 2.1;    // hole in the lid: press fit
-lp_bore     = 2.25;   // bore of the tubes
+lp_hole     = 2.4;    // hole in the lid (small printed holes come out ~0.3 mm tighter:
+                      // the rod must push in; too tight: ream with a 2 mm drill bit)
+lp_bore     = 2.8;    // bore of the tubes: loose guide
 lp_wall     = 1;      // tube wall
 lp_led_gap  = 0.5;    // rod end to LED top (small: less light reaches the next rod)
 // LED positions on the board (Adafruit Eagle file, Rev B), from the board's
@@ -255,7 +260,7 @@ pb_leds = [[5.429, 20.861, "LOW", 6], [6.223, 1.143, "DONE", 0], [9.779, 1.143, 
 /* [230 V power supply bay (at the bottom, full width between the columns)] */
 psu_x0     = -54;   // left wall of the bay (left of it: corridor for the battery wires)
 psu_x1     = 60;    // right wall
-psu_y1     = -18;   // top wall (bay inside 58 mm tall: the 56 mm supply board + 1 mm per side)
+psu_y1     = -in_h/2 + 62;  // top wall (bay inside 58 mm tall: the 56 mm supply board + 1 mm per side)
 psu_wall   = 2;
 psu_top    = 3.5;   // the bay ends 3.5 mm below the rim (cover top 1.5 mm below the lid)
 psu_comp_h = 21.5;  // tallest part on the supply board (IRM-10-5: 21.5 mm)
@@ -300,9 +305,25 @@ ant_x    = -52;    // top wall, left: close to the ESP32 module (13 cm pigtail)
 ant_d    = 6.6;    // panel-mount SMA / RP-SMA connector
 
 /* [Wall mounting (holes in the back)] */
-// [-27,17] is under the board: screw the enclosure to the wall BEFORE fitting it.
+// [-27,23] is under the board: screw the enclosure to the wall BEFORE fitting it.
 // The last two are in the battery bay (between the cradle and the door columns)
-wall_holes   = [[-56,66],[55,52],[58,-8],[-27,17],[-50,-110],[50,-110]];
+wall_holes   = [[-58,70],[58,74],[22,-22],[-27,23],[-50,-122],[50,-122]];
+
+/* [Wago 221-412 holder and wire management] */
+// Three 2-conductor Wago 221 (13 x 18.6 x 8.3 mm) clip between ribs against
+// the right wall, wire entries facing left, levers free on top.
+wago_n   = 3;
+wago_w   = 13.3;    // pocket width (Wago 13.0)
+wago_l   = 18.8;    // pocket depth
+wago_y0  = -12;     // bottom of the holder
+wago_h   = 5;       // rib height
+// Small bridges on the floor: push a cable tie under the bar and tie the
+// wires (or a small board) on top of it. [x, y, rotation]: 0 = for wires
+// running left-right, 90 = for wires running up-down.
+tie_points = [[-50,-19,0], [-20,-19,0], [6,-19,0],      // strip below the board
+              [18.5,2,90], [18.5,36,90],                // channel right of the board
+              [-45,62.5,0], [-10,62.5,0],               // strip above the board
+              [37,5,90], [37,27,90]];                   // battery divider board (15 x 35)
 wall_screw_d = 4.5;
 wall_head_d  = 8.5;
 
@@ -316,7 +337,7 @@ vent_l     = 14;
 // horizontal like louvres. The 230 V bay stays closed.
 vent_low_n  = 3;    // inlet slots on each side, starting just above the bay
 vent_high_n = 4;    // outlet slots on each side
-vent_high_y0= 44;   // first outlet slot (up to ~62)
+vent_high_y0= 58;   // first outlet slot (up to ~76)
 vent_pitch  = 6;
 
 $fn = 64;
@@ -408,6 +429,8 @@ module base() {
             pack_cradle();
             strap_loops();
             pb_cradle();
+            wago_holder();
+            for (t = tie_points) tie_bridge(t[0], t[1], t[2]);
         }
         // lid screw holes (heat-set inserts or self-tapping screws)
         if (lid_fix == "magnets") {
@@ -545,6 +568,25 @@ module strap_loops() {
         for (sy = [-1,1]) translate([-2, sy*(L/2 + 1) - 1, 0])
             cube([4, 2, strap_gap + strap_bar + 0.1]);
         translate([-2, -L/2 - 2, strap_gap + 0.1]) cube([4, L + 4, strap_bar]);
+    }
+}
+
+// ribs for the Wago 221 connectors, against the right wall. A small bump at
+// the open end of each rib keeps the connector from sliding out.
+module wago_holder() {
+    t = 1.2; x1 = in_w/2 + 0.5;            // sinks 0.5 mm into the wall
+    for (i = [0 : wago_n]) translate([x1 - wago_l - 0.5, wago_y0 + i*(wago_w + t), floor_t - 0.1]) {
+        cube([wago_l + 0.5, t, wago_h + 0.1]);
+        for (dy = [i > 0 ? -0.4 : t/2, i < wago_n ? t + 0.4 : t/2])
+            translate([0.7, dy, 0]) cylinder(d = 1.2, h = wago_h + 0.1, $fn = 16);
+    }
+}
+
+// bridge for a cable tie: 5 mm wide, 2.2 mm high tunnel
+module tie_bridge(x, y, rot = 0) {
+    translate([x, y, floor_t - 0.1]) rotate(rot) {
+        for (sx = [-1, 1]) translate([sx*3.3 - 0.8, -1.5, 0]) cube([1.6, 3, 2.2 + 1.6 + 0.1]);
+        translate([-4.1, -1.5, 2.2 + 0.1]) cube([8.2, 3, 1.6]);
     }
 }
 

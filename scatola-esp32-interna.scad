@@ -185,6 +185,14 @@ use_side_open = true;
 sig_open_w   = 12;    // signal part, above the rib (along the wall)
 mains_open_w = 10;    // 230 V part, below the rib (cable up to ~8.5 mm)
 side_open_h  = 11;    // height from the wall surface
+// Signal part open up to the rim: the two ethernet cables, already fitted
+// with their JST connectors, are laid in from the front with the lid off
+// (no connector has to pass through a hole). A tongue under the lid closes
+// the slot down to the cables and holds them (add a strip of foam rubber
+// under it for a softer clamp).
+sig_slot_top  = true;
+cable_pass_h  = 6;    // room left under the tongue: two slim patch cables (~4 mm) side by side
+tongue_clear  = 0.3;  // tongue clearance in the slot, each side
 // total = sig_open_w + psu_wall + mains_open_w = 24 mm: a 25 x 10 trunking
 // with a divider, or two small ones side by side
 
@@ -454,7 +462,7 @@ module base() {
         // side opening, open at the back: signals above the rib, 230 V below
         if (use_side_open) {
             translate([in_w/2 - 1, psu_y1, -0.1])
-                cube([wall + 2, sig_open_w, side_open_h + 0.1]);
+                cube([wall + 2, sig_open_w, (sig_slot_top ? base_h + 1 : side_open_h) + 0.1]);
             translate([in_w/2 - 1, psu_y1 - psu_wall - mains_open_w, -0.1])
                 cube([wall + 2, mains_open_w, side_open_h + 0.1]);
             // into the bay through its right wall
@@ -705,6 +713,14 @@ module lid_assembled() {
             translate([0, 0, z0]) linear_extrude(lid_t) half2d(true, 0, fit/2);
             // centring lip that fits inside the enclosure
             translate([0, 0, z0 - 3]) lip(true);
+            // tongue closing the cable slot down to the cables (outer face 0.2 mm
+            // inside the wall face, bottom edge chamfered so it slides over the cables)
+            if (use_side_open && sig_slot_top)
+                translate([in_w/2 - 0.5, psu_y1 + tongue_clear, cable_pass_h])
+                hull() {
+                    translate([0, 0, 1]) cube([wall + 0.5 - 0.2, sig_open_w - 2*tongue_clear, z0 - cable_pass_h - 1 + 0.1]);
+                    translate([0.5, 0.5, 0]) cube([wall - 0.5 - 0.2, sig_open_w - 2*tongue_clear - 1, 1]);
+                }
             // light box: white walls around the strip, from the lid down to just
             // above the LED rib. Light bounces inside and leaves only through the
             // diffuser, so the LEDs merge into one even bar. Print the lid in white

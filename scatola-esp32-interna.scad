@@ -322,6 +322,8 @@ wall_holes   = [[-58,70],[58,74],[22,-22],[-27,23],[-50,-122],[50,-122]];
 /* [Wago 221-412 holder and wire management] */
 // Three 2-conductor Wago 221 (13 x 18.6 x 8.3 mm) clip between ribs against
 // the right wall, wire entries facing left, levers free on top.
+use_wago = false;   // not needed: the power nodes are made on the PowerBoost pads
+                    // and on the ESP board terminals (see the README wiring notes)
 wago_n   = 3;
 wago_w   = 13.3;    // pocket width (Wago 13.0)
 wago_l   = 18.8;    // pocket depth
@@ -439,7 +441,7 @@ module base() {
             pack_cradle();
             strap_loops();
             pb_cradle();
-            wago_holder();
+            if (use_wago) wago_holder();
             for (t = tie_points) tie_bridge(t[0], t[1], t[2]);
         }
         // lid screw holes (heat-set inserts or self-tapping screws)

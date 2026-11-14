@@ -96,7 +96,9 @@ board_headroom = 20;  // min. room above the terminal board (ESP32 + terminals +
                       // inner depth = the largest of board / power supply / pack needs
 wall     = 2.4;   // wall thickness
 floor_t  = 3;     // back thickness
-lid_t    = 2.5;   // lid thickness
+lid_t    = 3.5;   // lid thickness. 2.5 mm of black PLA let the LED strip and
+                  // the ESP32 LED show through: 3.5 mm, and print the lid and
+                  // the door with 100% infill (no infill pattern in the light)
 corner_r = 4;     // outer corner radius
 fit      = 0.3;   // clearance between lid and walls
 
@@ -111,7 +113,7 @@ fit      = 0.3;   // clearance between lid and walls
 // The 230 V cover inside always stays screwed.
 lid_fix  = "magnets";
 mag_d    = 8;     // magnet diameter (8 x 2 mm N52 discs, 12 needed)
-mag_h    = 2;     // magnet thickness (lid_t - 0.5 at most)
+mag_h    = 2;     // magnet thickness (lid_t - 0.5 at most: 1.5 mm skin in front)
 mag_clr  = 0.2;   // pocket clearance on the diameter
 notch_w  = 16;    // fingernail notches (door bottom edge, dividing wall)
 

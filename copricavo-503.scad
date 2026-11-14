@@ -64,7 +64,7 @@ mod_w    = win_w/3; // window modules, from the left: pre-drilled blank,
 /* [Box (for the preview only)] */
 box_out_w = 144.8;
 box_out_h = 257.2;
-box_out_d = 35.6;
+box_out_d = 36.6;
 box_top_y = 124.4;  // top edge of the box above the side opening centre
 
 $fn = 48;

@@ -4,7 +4,8 @@
 //  oxid-icon.svg, oxid-engrave.svg).
 //  Use it with:  use <oxid_logo.scad>
 //
-//  oxid_wordmark_2d(w, which): "OXID", w = width in mm (height = 0.294 w)
+//  oxid_wordmark_2d(w, which, simple): "OXID", w = width in mm (height = 0.294 w);
+//      simple = true: chip without pins (below ~70 mm they would be < 0.5 mm)
 //      which = "dark"   O, I, D            (navy  #0F1E3D)
 //              "accent" X + chip + dot     (blue  #1F8BF5)
 //              "all"    both
@@ -56,7 +57,7 @@ module _wm_dark() {
         }
     }
 }
-module _wm_accent() {
+module _wm_accent(simple = false) {
     translate([50 + 41*cos(45), 50 + 41*sin(45)]) circle(6.5);   // signal dot
     difference() {                                      // X, with room for the chip
         union() {
@@ -65,12 +66,12 @@ module _wm_accent() {
         }
         _rsq(158, 50, 40, 7.2);
     }
-    _chip(158, 50, 24, 40);
+    _chip(158, 50, 24, 40, pins = !simple);
 }
-module oxid_wordmark_2d(w = 100, which = "all") {
+module oxid_wordmark_2d(w = 100, which = "all", simple = false) {
     scale(w/340) translate([-170, -50]) {
         if (which == "dark"   || which == "all") _wm_dark();
-        if (which == "accent" || which == "all") _wm_accent();
+        if (which == "accent" || which == "all") _wm_accent(simple);
     }
 }
 

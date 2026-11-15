@@ -84,9 +84,10 @@ part = "all";            // "base", "lid", "lightbox", "door", "lid230", "diffus
 //            bright blue reads better on black). The part names stay the same.
 // "none":    plain lid
 logo_mode  = "inlay";
-logo_size  = 90;     // wordmark width (mm), height = 0.294 x width
-logo_x     = 0;      // wordmark centre on the lid, seen from the room
-logo_y     = -45;    // on the lower half of the lid (over the 230 V bay)
+logo_size  = 45;     // wordmark width (mm), height = 0.294 x width.
+                     // Below 70 mm the chip is drawn without pins (too thin to print)
+logo_x     = 38;     // wordmark centre on the lid, seen from the room: bottom right
+logo_y     = -77;    // ~10 mm from the bottom edge, clear of the magnet pockets
 logo_depth = 0.8;    // engraving depth (lid is lid_t thick)
 
 /* [Enclosure] */
@@ -787,7 +788,7 @@ module lightbox(sep = false) {     // sep: separate part, it stops at the lid
 
 // ---------------- LOGO (oxid_logo.scad) ----------------
 module logo_solid(which, h) {
-    translate([logo_x, logo_y, 0]) linear_extrude(h) oxid_wordmark_2d(logo_size, which);
+    translate([logo_x, logo_y, 0]) linear_extrude(h) oxid_wordmark_2d(logo_size, which, simple = logo_size < 70);
 }
 // inlay parts, in the same position as the printed lid (visible face on the bed)
 module logo_part_print(which) {

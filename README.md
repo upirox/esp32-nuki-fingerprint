@@ -25,7 +25,7 @@ Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nu
 | `nuki_fingerprint.yaml` | ESPHome configuration. Wiring is documented in the header. |
 | `common/base_config.yaml` | Shared ESPHome package: Wi-Fi, encrypted OTA/API, SNTP, diagnostics (its diagnostic entity names are still in Italian, since other devices share it). |
 | `common/secrets.example.yaml` | Secrets you need to provide (copy to `secrets.yaml`). |
-| `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The two 503 screws are hidden under flush printed caps held by small magnets (`part = "screw_cap"`); OXID icon engraved bottom-right. A fin on the back holds the tamper lever microswitch (pressed by the inner wall of the box), and two posts carry a separate tray (`part = "rj45_tray"`) for the two RJ45 breakouts. |
+| `placca-503-campanello.scad` | OpenSCAD outdoor plate for an Italian 503 flush box (OLED, R503, PIR, push button, buzzer, reed, rubber cord seal). The two 503 screws are hidden under flush printed caps held by small magnets (`part = "screw_cap"`); OXID icon engraved bottom-right. A fin on the back holds the tamper lever microswitch (pressed by the inner wall of the box), and two cable-tie bridges hold the JST pigtail bundle (the old RJ45 tray is still available with `use_rj45`). |
 | `scatola-esp32-interna.scad` | OpenSCAD indoor enclosure (144.8 × 257.2 × 36.6 mm): ESP32 terminal board, PowerBoost, LED strip with light box and diffuser, indoor buzzer, optional holder for three Wago 221-412 (`use_wago`), cable-tie bridges along the wire runs, separate 230 V bay and, at the bottom, a battery bay for the 3 × 18650 pack with its own screwed door (part `door`), split from the rest by a full-height wall. Lid and door are held by hidden 8 × 2 mm magnets: no screws on the front (`lid_fix`). Mounted next to an indoor wall socket: all cables come in through one opening in the right wall, split by a rib into a signal part and a 230 V part that leads into the bay through a closed channel with a cable tie (no mains in the outdoor box). |
 | `copricavo-503.scad` | OpenSCAD cable cover from the indoor 503 (BTicino Livinglight, 3 modules) to the ESP32 box: it sits on a pre-drilled blank in the leftmost module, climbs over the curved plate border and ends at the side opening of the box, with a divider between the 230 V cable and the ethernet cables. Box 20 mm to the left of the plate, its top edge 124.4 mm above the plate centre. Fixed with removable tape (it must come off before the plate). |
 | `copricavo-anteprima.png` | Front view and section of the cable cover. |
@@ -35,7 +35,6 @@ Tested with **ESPHome 2026.10.1**, an ESP32-WROOM-32U DevKit (38 pin) and a **Nu
 | `coperchio-logo-anteprima.png` | Lid with the OXID wordmark as a two-colour inlay (`logo_mode`: "inlay" with the `logo_dark` / `logo_accent` parts for a multi-material printer, or "engrave" and paint). On a black lid print `logo_dark` in white; the light box walls are a separate `lightbox` part to print in white. |
 | `oxid_logo.scad` | OXID logo in OpenSCAD (wordmark and icon, 2D), used by the lid and the plate. |
 | `esp32-nuki-fingerprint.code-workspace` | VS Code / Studio Code Server workspace: opens the YAML files as plain YAML and declares the ESPHome tags (`!lambda`, `!secret`...), so the editor shows no false "Unresolved tag" errors. |
-| `plate-connector-rj45.png` | Wiring of the two RJ45 connectors between the outdoor plate and the ESP32. |
 | `plate-power-strip.png` | 3V3 / GND distribution strip behind the outdoor plate. |
 | `power schema.pdf` | Backup power wiring (in Italian): power supply PCB (IRM-10-5, fuse, varistor, mains-sense divider, J1/J2 terminals), PowerBoost 1000C, battery and the battery voltage divider. |
 
@@ -61,13 +60,14 @@ GPIO19 ──── microswitch C ──── microswitch NO ──── reed 
 
 Both contacts are closed while the plate is screwed on, so GPIO19 reads LOW. If either opens (plate removed, cable cut, microswitch released even with a magnet holding the reed) the input goes HIGH through the internal pull-up and the tamper alarm fires. The firmware sees a single contact, so no configuration change is needed when adding the microswitch.
 
-### Plate connector (2 × RJ45)
+### Plate connections (JST pigtails)
 
-The plate can be unplugged: two RJ45 breakout boards (RJ45 jack + 8 screw terminals) are screwed to the back of the plate, and two Cat5e/Cat6 cables from the ESP32, crimped with **T568B** plugs, plug into them. Use the same table at the ESP32 end (another pair of breakouts, or the bare wires into the terminal board). Label the cables and the jacks **A** and **B**: swapping them connects outputs to outputs.
+Two slim patch cables (28 AWG, stranded) run from the indoor enclosure to the plate, labelled **A** and **B**, colours in **T568B** order.
 
-![Plate connector wiring](plate-connector-rj45.png)
+- **At the plate:** the cable wires are soldered (with heat-shrink) to 6-pin JST pigtails **J1–J4**; the mating pigtails go to the parts. Two cable-tie bridges on the back of the plate hold the bundle, so a pull never reaches the solder joints.
+- **In the enclosure:** each cable ends in JST SM wire-to-wire connectors (A: 6 poles, B: 6 + 2 poles) right inside the side slot; the other halves go to the ESP32 terminals. The cables are laid in the slot from the front, already fitted, and a tongue under the lid holds them.
 
-| Pin | T568B colour | Cable A (display, power) | Cable B (reader, sensors) |
+| Pair | T568B colour | Cable A | Cable B |
 |---|---|---|---|
 | 1 | white-orange | GND | GND |
 | 2 | orange | OLED D0 / SCK → GPIO18 | R503 TX (yellow) → GPIO16 |
@@ -75,10 +75,23 @@ The plate can be unplugged: two RJ45 breakout boards (RJ45 jack + 8 screw termin
 | 4 | blue | OLED CS → GPIO5 | doorbell button → GPIO33 |
 | 5 | white-blue | OLED DC → GPIO27 | button LED ring + → GPIO32 |
 | 6 | green | OLED D1 / MOSI → GPIO23 | R503 WAKEUP (blue) → GPIO4 |
-| 7 | white-brown | OLED RES → GPIO26 | PIR OUT → GPIO34 |
-| 8 | brown | outdoor buzzer I/O → GPIO25 | tamper loop → GPIO19 |
+| 7 | white-brown | *(unused)* | PIR OUT → GPIO34 |
+| 8 | brown | *(unused)* | tamper loop → GPIO19 |
 
-Each fast or sensitive signal shares a twisted pair with GND (SCK, R503 TX). On the plate, 3V3 and GND go to a small distribution strip (a piece of stripboard with two copper strips and 2.54 mm screw terminals, see `plate-power-strip.png`): 3V3 feeds the R503 (VCC and 3.3VT), OLED, PIR and outdoor buzzer; GND goes to all of them plus the push button, the LED ring cathode and the end of the tamper loop. The PIR's 100 kΩ pull-down stays at the ESP32 end, between GPIO34 and GND. Mount the jacks facing down or sideways, so condensation can't collect in them.
+**OLED RES (GPIO26)** and the **outdoor buzzer (GPIO25)** run on the two wires of the old doorbell, which already connected the two boxes (A7 and A8 broke inside their JST and are not used).
+
+JST pigtails at the plate (black is always GND, red always 3V3):
+
+| JST | black | red | yellow | white | orange | green |
+|---|---|---|---|---|---|---|
+| J1 | GND (A1) | 3V3 (A3) | SCK (A2) | MOSI (A6) | CS (A4) | DC (A5) |
+| J2 | GND (B1) | spare | RES* | buzzer* | PIR (B7) | tamper (B8) |
+| J3 | spare | spare | R503 TX (B2) | R503 RX (B3) | WAKEUP (B6) | spare |
+| J4 | spare | spare | button (B4) | ring LED + (B5) | spare | spare |
+
+\* now on the old doorbell wires.
+
+On the plate, 3V3 and GND go to a small distribution strip (see `plate-power-strip.png`): 3V3 feeds the R503 (VCC and 3.3VT), OLED, PIR and outdoor buzzer; GND goes to all of them plus the push button, the LED ring cathode and the end of the tamper loop. The PIR's 100 kΩ pull-down is soldered at the PIR, between OUT and GND. The routing inside the enclosure is in `internal-wiring.png`.
 
 ## Getting started
 

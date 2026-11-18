@@ -156,7 +156,7 @@ ms_pilot_d    = 2.6;
 // printed flat, held by 2 M3 self-tapping screws; the boards by 2 cable ties.
 // Checked on the real boards: jack on one short end, lever terminals at the
 // other end (wires enter from the end opposite the jack).
-use_rj45      = true;
+use_rj45      = false;  // OLD: replaced by JST pigtails (see below and the README)
 rj_len        = 33;     // board length, jack end to terminal end (along x)
 rj_w          = 48;     // the two boards side by side (along y)
 rj_jack_x     = 0;      // x of the jack end of the boards (seen from the street)
@@ -167,8 +167,16 @@ rj_rail       = 3;      // side rails that keep the boards in place
 rj_post_d     = 8;
 rj_post_y     = 21;     // posts at (rj_jack_x - 1, +/- rj_post_y)
 
+/* [Wiring: JST pigtails and cable-tie bridges on the back] */
+// The two ethernet cables are soldered to JST pigtails (J1-J4); the mating
+// pigtails go to the parts on the plate. Two bridges on the back, where the
+// RJ45 posts used to be, take a cable tie each: tie the cables / connector
+// bundle there, so a pull on the cables never reaches the solder joints or
+// the parts. [x, y] seen from the street; the tie runs left-right.
+plate_ties = [[-1, 21], [-1, -21]];
+
 /* [Seal] */
-part             = "all";      // "plate", "screw_cap", "rj45_tray", "gasket" (TPU only) or "all" (preview)
+part             = "all";      // "plate", "screw_cap", "gasket" (TPU only) or "all" (preview); "rj45_tray" only with use_rj45
 seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"
 
 /* [Rubber cord] */
@@ -371,6 +379,14 @@ module microswitch_preview() {
 rj_x0 = rj_jack_x - rj_len;           // terminal end of the boards
 rj_posts = [[rj_jack_x - 1, rj_post_y], [rj_jack_x - 1, -rj_post_y]];
 
+// bridge for a cable tie on the back: 5 mm wide, 2.5 mm high tunnel
+module plate_tie(x, y) {
+    translate([x, y, plate_t - 0.1]) {
+        for (sy = [-1, 1]) translate([-1.5, sy*3.5 - 0.9, 0]) cube([3, 1.8, 2.5 + 1.6 + 0.1]);
+        translate([-1.5, -4.4, 2.5 + 0.1]) cube([3, 8.8, 1.6]);
+    }
+}
+
 module rj45_posts() {
     for (p = rj_posts) translate([p[0], p[1], plate_t - 0.5])
         difference() {
@@ -449,6 +465,7 @@ buzzer_mount();
 reed_cradle();
 if (use_ms) microswitch_fin();
 if (use_rj45) rj45_posts();
+for (t = plate_ties) plate_tie(t[0], t[1]);
 }
 
 // All x positions in this file are "seen from the street". The front face is

@@ -66,6 +66,8 @@ oled_pcb_h   = 26;
 oled_win_w   = 23;    // visible window (active area ~21.7 x 10.9)
 oled_win_h   = 12.5;
 oled_win_dy  = 1.5;   // window centre relative to board centre (+ = towards the pins)
+oled_pin_dx  = 0.5;   // board (pins) moved this much to the RIGHT of the window, seen from
+                      // the street: the screen sat 0.5 mm left in the window (checked)
 oled_glass_t = 1.7;   // glass thickness above the PCB = standoff height
 oled_hole_dx = 22;    // board hole spacing, horizontal (measured on the real board)
 oled_hole_dy = 21.6;  //                   vertical
@@ -267,7 +269,7 @@ module oled_window() {
 
 module oled_mounts() {
     for (sx = [-1, 1], sy = [-1, 1])
-        translate([oled_x + sx*oled_hole_dx/2, oled_y + sy*oled_hole_dy/2, plate_t]) {
+        translate([oled_x + oled_pin_dx + sx*oled_hole_dx/2, oled_y + sy*oled_hole_dy/2, plate_t]) {
             cylinder(d = oled_post_d, h = oled_glass_t);
             cylinder(d = oled_pin_d, h = oled_glass_t + oled_pin_h);
         }

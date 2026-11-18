@@ -67,7 +67,7 @@ oled_win_w   = 23;    // visible window (active area ~21.7 x 10.9)
 oled_win_h   = 12.5;
 oled_win_dy  = 1.5;   // window centre relative to board centre (+ = towards the pins)
 oled_glass_t = 1.7;   // glass thickness above the PCB = standoff height
-oled_hole_dx = 20.8;  // board hole spacing, horizontal
+oled_hole_dx = 22;    // board hole spacing, horizontal (measured on the real board)
 oled_hole_dy = 21.6;  //                   vertical
 oled_pin_d   = 1.7;   // pins that go into the board holes (secure with heat or glue)
 oled_pin_h   = 3.5;
@@ -81,7 +81,7 @@ r503_hole_d  = 25.6;  // M25 thread clearance
 /* [AM312 PIR (~10 mm lens, 12 mm wide)] */
 pir_x        = 24;   // right column, above the push button
 pir_y        = 18;
-pir_hole_d   = 10.2;  // the lens goes through, the 12 mm rim seats against the plate
+pir_hole_d   = 10.5;  // the lens goes through, the 12 mm rim seats against the plate (10.2 was too tight)
 pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 
@@ -91,12 +91,15 @@ btn_y        = -12;
 btn_hole_d   = 19.3;  // 19 mm mounting hole + clearance
 
 /* [Buzzer (32.5 x 13 module, hidden behind the plate)] */
-buzz_x        = -42;   // centre of the buzzer cylinder (top-left corner)
+buzz_x        = -41.5; // centre of the buzzer cylinder (top-left corner; the ring stays inside the box opening)
 buzz_y        = 22;
 buzz_d        = 12;    // buzzer cylinder diameter
 buzz_h        = 9.5;   // cylinder height above the PCB
 buzz_ring_h   = 6;     // height of the retaining ring
 buzz_ring_w   = 1.2;
+buzz_lift     = 6;     // the buzzer sits on a tube this much further from the plate,
+                       // so its PCB (bent pins underneath) clears the back of the OLED
+buzz_ledge    = 1.5;   // ledge the buzzer rests on (the tube is a sound channel)
 buzz_pcb_dir  = 1;     // (only for the optional post) the module can be turned freely:
                        // point its PCB DOWN, beside the display, away from the OLED wires
 buzz_hole_off = 9.5;   // distance of the module's M3 hole from the buzzer centre
@@ -275,17 +278,20 @@ module pir_boss() {
 
 module buzzer_mount() {
     // ring holding the buzzer cylinder, facing the plate
-    translate([buzz_x, buzz_y, plate_t])
+    translate([buzz_x, buzz_y, plate_t - 0.01])
         difference() {
-            cylinder(d = buzz_d + 0.3 + 2*buzz_ring_w, h = buzz_ring_h);
-            translate([0, 0, -0.01]) cylinder(d = buzz_d + 0.3, h = buzz_ring_h + 0.02);
+            cylinder(d = buzz_d + 0.3 + 2*buzz_ring_w, h = buzz_lift + buzz_ring_h + 0.01);
+            // sound channel from the grille to the buzzer
+            translate([0, 0, -0.01]) cylinder(d = buzz_d - 2*buzz_ledge, h = buzz_lift + 0.03);
+            // seat of the buzzer, above the ledge
+            translate([0, 0, buzz_lift]) cylinder(d = buzz_d + 0.3, h = buzz_ring_h + 0.02);
         }
     // post for the screw: the PCB rests on the buzzer and is fixed here
     if (buzz_use_post)
     translate([buzz_x + buzz_pcb_dir*buzz_hole_off, buzz_y, plate_t])
         difference() {
-            cylinder(d = buzz_post_d, h = buzz_h);
-            translate([0, 0, 2]) cylinder(d = buzz_screw_d, h = buzz_h);
+            cylinder(d = buzz_post_d, h = buzz_lift + buzz_h);
+            translate([0, 0, 2]) cylinder(d = buzz_screw_d, h = buzz_lift + buzz_h);
         }
 }
 

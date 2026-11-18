@@ -143,9 +143,13 @@ ms_T          = 10;     // body thickness (screws go through it)
 ms_y          = 21.5;   // centre of the body thickness (top-left corner of the box)
 ms_wall_gap   = 1.5;    // lever face of the body to the box inner wall
 ms_lever_over = 10;     // lever length beyond the front end of the body (cut it)
-ms_hole_d     = 3.1;    // body holes (MEASURE: standard V switch 3.1 mm,
-ms_hole_pitch = 22.2;   //  22.2 mm apart, 5.1 mm from the side opposite
-ms_hole_side  = 5.1;    //  the lever)
+ms_hole_d     = 3.1;    // body holes
+// Holes in OPPOSITE CORNERS (this switch, from the photo; check with a caliper):
+// [u, v] = u from the body end on the lever-tip side (towards the plate),
+//          v from the lever face of the body (towards the box wall).
+// One hole near the lever tip and far from the lever face, the other at the
+// terminal end, next to the lever face: 22.2 mm apart along the body.
+ms_holes      = [[3.0, 13.6], [25.2, 2.4]];
 ms_fin_t      = 3;      // fin the switch is screwed to (M3 self-tapping, or M2.5 + nut)
 ms_pilot_d    = 2.6;
 
@@ -348,7 +352,8 @@ module gasket() {
 ms_z0 = plate_t + box_recess + 1 + ms_lever_over;
 ms_xf = ms_side*(box_in_w/2 - ms_wall_gap);       // lever face of the body
 ms_x0 = ms_side > 0 ? ms_xf - ms_H : ms_xf;        // body x range: ms_x0 .. ms_x0 + ms_H
-ms_xh = ms_side > 0 ? ms_x0 + ms_hole_side : ms_x0 + ms_H - ms_hole_side;  // screw holes
+// screw holes in plate coordinates: [x, z]
+ms_hole_pos = [for (h = ms_holes) [ms_xf - ms_side*h[1], ms_z0 + h[0]]];
 
 module microswitch_fin() {
     // fin above the switch (towards the top wall of the box), from the plate up
@@ -364,16 +369,19 @@ module microswitch_fin() {
                         polygon([[0, 0], [-4, 0], [0, 9]]);
         }
         // holes for the switch screws
-        for (dz = [-ms_hole_pitch/2, ms_hole_pitch/2])
-            translate([ms_xh, fy - 0.1, ms_z0 + ms_L/2 + dz])
+        for (h = ms_hole_pos)
+            translate([h[0], fy - 0.1, h[1]])
                 rotate([-90, 0, 0]) cylinder(d = ms_pilot_d, h = ms_fin_t + 0.2, $fn = 24);
     }
 }
 
 // preview only: switch body and lever
 module microswitch_preview() {
-    color("DarkSlateGray")
+    color("DarkSlateGray") difference() {
         translate([ms_x0, ms_y - ms_T/2, ms_z0]) cube([ms_H, ms_T, ms_L]);
+        for (h = ms_hole_pos) translate([h[0], ms_y - ms_T/2 - 0.1, h[1]])
+            rotate([-90, 0, 0]) cylinder(d = ms_hole_d, h = ms_T + 0.2, $fn = 24);
+    }
     color("Silver")   // lever, pressed against the wall
         hull() {
             translate([ms_xf + ms_side*0.25 - 0.25, ms_y - 2, ms_z0 + ms_L - 3]) cube([0.5, 4, 0.5]);

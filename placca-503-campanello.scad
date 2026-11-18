@@ -144,12 +144,13 @@ ms_y          = 21.5;   // centre of the body thickness (top-left corner of the 
 ms_wall_gap   = 1.5;    // lever face of the body to the box inner wall
 ms_lever_over = 10;     // lever length beyond the front end of the body (cut it)
 ms_hole_d     = 3.1;    // body holes
-// Holes in OPPOSITE CORNERS (this switch, from the photo; check with a caliper):
+// Holes in OPPOSITE CORNERS (measured: 3 mm from the short and the long side,
+// 22 mm apart along the body; 3 + 22 + 3 = 28 mm body):
 // [u, v] = u from the body end on the lever-tip side (towards the plate),
 //          v from the lever face of the body (towards the box wall).
 // One hole near the lever tip and far from the lever face, the other at the
-// terminal end, next to the lever face: 22.2 mm apart along the body.
-ms_holes      = [[3.0, 13.6], [25.2, 2.4]];
+// terminal end, next to the lever face.
+ms_holes      = [[3, 13], [25, 3]];
 ms_fin_t      = 3;      // fin the switch is screwed to (M3 self-tapping, or M2.5 + nut)
 ms_pilot_d    = 2.6;
 

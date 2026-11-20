@@ -23,6 +23,14 @@
 
 use <oxid_logo.scad>
 
+/* [Part to export] */
+// "plate":     the plate alone, front face on the bed: the STL to print
+// "screw_cap": one cap for the 503 screws (print 2)
+// "gasket":    TPU gasket (only with seal = "tpu")
+// "rj45_tray": old RJ45 tray (only with use_rj45)
+// "all":       assembled preview (switch, cord and caps drawn in place: do NOT export)
+part = "all";
+
 /* [Plate] */
 plate_w      = 120;   // width
 plate_h      = 85;    // height (covers the unplastered edge around the box)
@@ -186,7 +194,6 @@ rj_post_y     = 21;     // posts at (rj_jack_x - 1, +/- rj_post_y)
 plate_ties = [[-1, 21], [-1, -21]];
 
 /* [Seal] */
-part             = "all";      // "plate", "screw_cap", "gasket" (TPU only) or "all" (preview); "rj45_tray" only with use_rj45
 seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"
 
 /* [Rubber cord] */

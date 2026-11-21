@@ -94,7 +94,9 @@ r503_hole_d  = 25.6;  // M25 thread clearance
 /* [AM312 PIR (~10 mm lens, 12 mm wide)] */
 pir_x        = 16;   // right column, above the push button (same x)
 pir_y        = 18;
-pir_hole_d   = 10.8;  // the lens goes through, the 12 mm rim seats against the plate (10.3 too tight once printed)
+pir_hole_d   = 10.8;  // the 10.5 mm lens cylinder goes in from the front (10.3 too tight once printed)
+pir_chamfer  = 0.5;   // 45° lead-in on the front face: removes the elephant foot of the
+                      // first layers (front face is on the bed); hidden by the dome
 pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 
@@ -490,6 +492,8 @@ difference() {
 
     translate([r503_x, r503_y, -0.01]) cylinder(d = r503_hole_d, h = plate_t + 0.02);
     translate([pir_x,  pir_y,  -0.01]) cylinder(d = pir_hole_d,  h = plate_t + 0.02);
+    translate([pir_x,  pir_y,  -0.01])
+        cylinder(d1 = pir_hole_d + 2*pir_chamfer + 0.02, d2 = pir_hole_d, h = pir_chamfer + 0.01);
     translate([btn_x,  btn_y,  -0.01]) cylinder(d = btn_hole_d,  h = plate_t + 0.02);
 }
 

@@ -67,7 +67,7 @@ screw_boss_d = 11;    // boss on the back around the screw hole
 screw_boss_h = 2.3;   // < box_recess (2.5): it never touches the box rim
 
 /* [0.96" OLED display (25.2 x 26 board)] */
-oled_x       = -20;   // board centre position (left column, above the reader)
+oled_x       = -16;   // board centre position (left column, above the reader)
 oled_y       = 16;
 oled_pcb_w   = 25.2;
 oled_pcb_h   = 26;
@@ -84,25 +84,25 @@ oled_pin_h   = 3.5;
 oled_post_d  = 4;
 
 /* [R503 reader (M25 thread, 28 mm flange)] */
-r503_x       = -20;   // left column, below the display
+r503_x       = -16;   // left column, below the display (same x as the display)
 r503_y       = -14;
 r503_hole_d  = 25.6;  // M25 thread clearance
 
 /* [AM312 PIR (~10 mm lens, 12 mm wide)] */
-pir_x        = 24;   // right column, above the push button
+pir_x        = 16;   // right column, above the push button (same x)
 pir_y        = 18;
 pir_hole_d   = 10.3;  // the lens goes through, the 12 mm rim seats against the plate (10.2 too tight, 10.3 tried by hand)
 pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 
 /* [Vandal-proof doorbell button (22 head, 19 hole, 14 thread, 27 depth)] */
-btn_x        = 24;   // right column, below the PIR
+btn_x        = 16;   // right column, below the PIR
 btn_y        = -12;
 btn_hole_d   = 19.3;  // 19 mm mounting hole + clearance
 
 /* [Buzzer (32.5 x 13 module, hidden behind the plate)] */
-buzz_x        = -41.5; // centre of the buzzer cylinder (top-left corner; the ring stays inside the box opening)
-buzz_y        = 22;
+buzz_x        = -38;   // centre of the buzzer cylinder (top-left: ring ~4 mm from the box wall,
+buzz_y        = 20;    //  2 mm from the display board; module PCB pointing DOWN, beside the display)
 buzz_d        = 12;    // buzzer cylinder diameter
 buzz_h        = 9.5;   // cylinder height above the PCB
 buzz_ring_h   = 6;     // height of the retaining ring
@@ -124,7 +124,7 @@ sound_holes   = true;  // false = solid plate (much quieter sound)
 // The reed sits in a cradle on the back, parallel to the bottom edge of
 // the box. The magnet (6 x 2 mm) is glued to the inside wall of the box,
 // facing ONE END of the reed body.
-reed_x        = -41;   // centre of the reed body (bottom-left, close to the box bottom wall)
+reed_x        = -38;   // centre of the reed body (bottom-left, close to the box bottom wall, ~4 mm from the side wall)
 reed_y        = -26;   // closer to the box edge = stronger magnet effect
 reed_len      = 14.4;  // 14 mm body + clearance
 reed_w        = 3.5;   // 3.2 mm body + clearance
@@ -151,7 +151,8 @@ ms_L          = 28;     // body length (along the depth of the box)
 ms_H          = 16;     // body height: lever side faces the box wall
 ms_T          = 10;     // body thickness (screws go through it)
 ms_y          = 21.5;   // centre of the body thickness (top-left corner of the box)
-ms_wall_gap   = 1.5;    // lever face of the body to the box inner wall
+ms_wall_gap   = 4.5;    // lever face of the body to the box inner wall (1.5 was too tight: bend
+                        //  the lever out so its tip still presses on the wall)
 ms_lever_over = 10;     // lever length beyond the front end of the body (cut it)
 ms_hole_d     = 3.1;    // body holes
 // Holes in OPPOSITE CORNERS (measured: 3 mm from the short and the long side,
@@ -191,7 +192,7 @@ rj_post_y     = 21;     // posts at (rj_jack_x - 1, +/- rj_post_y)
 // RJ45 posts used to be, take a cable tie each: tie the cables / connector
 // bundle there, so a pull on the cables never reaches the solder joints or
 // the parts. [x, y] seen from the street; the tie runs left-right.
-plate_ties = [[-1, 21], [-1, -21]];
+plate_ties = [[0, 21], [0, -21]];   // between the two columns
 
 /* [Seal] */
 seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"

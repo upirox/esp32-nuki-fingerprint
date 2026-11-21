@@ -94,7 +94,7 @@ r503_hole_d  = 25.6;  // M25 thread clearance
 /* [AM312 PIR (~10 mm lens, 12 mm wide)] */
 pir_x        = 16;   // right column, above the push button (same x)
 pir_y        = 18;
-pir_hole_d   = 10.3;  // the lens goes through, the 12 mm rim seats against the plate (10.2 too tight, 10.3 tried by hand)
+pir_hole_d   = 10.8;  // the lens goes through, the 12 mm rim seats against the plate (10.3 too tight once printed)
 pir_boss_h   = 3;     // centring ring behind the plate
 pir_boss_w   = 1.6;
 

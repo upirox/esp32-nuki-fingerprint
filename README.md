@@ -78,7 +78,7 @@ Two slim patch cables (28 AWG, stranded) run from the indoor enclosure to the pl
 | 7 | white-brown | *(unused)* | PIR OUT → GPIO34 |
 | 8 | brown | *(unused)* | tamper loop → GPIO19 |
 
-**OLED RES (GPIO26)** and the **outdoor buzzer (GPIO25)** run on the two wires of the old doorbell, which already connected the two boxes (A7 and A8 broke inside their JST and are not used).
+**OLED RES (GPIO26)** and the **outdoor buzzer (GPIO25)** run on the two wires of the old doorbell, which already connected the two boxes: **light blue → RES** (C blue), **grey → buzzer** (C green). A7 and A8 broke inside their JST and are not used. The old doorbell wires must be disconnected from the mains at both ends; label them as low-voltage signal wires, since light blue normally means neutral.
 
 JST pigtails at the plate (black is always GND, red always 3V3):
 

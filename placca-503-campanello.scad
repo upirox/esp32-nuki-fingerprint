@@ -102,12 +102,13 @@ btn_hole_d   = 19.3;  // 19 mm mounting hole + clearance
 
 /* [Buzzer (32.5 x 13 module, hidden behind the plate)] */
 buzz_x        = -38;   // centre of the buzzer cylinder (top-left: ring ~4 mm from the box wall,
-buzz_y        = 20;    //  2 mm from the display board; module PCB pointing DOWN, beside the display)
+buzz_y        = 20;    //  2 mm from the display board). Module PCB pointing RIGHT, over the back of
+                       //  the display (down it would hit the 503 screw column, left/up the box walls)
 buzz_d        = 12;    // buzzer cylinder diameter
 buzz_h        = 9.5;   // cylinder height above the PCB
 buzz_ring_h   = 6;     // height of the retaining ring
 buzz_ring_w   = 1.2;
-buzz_lift     = 6;     // the buzzer sits on a tube this much further from the plate,
+buzz_lift     = 8;     // the buzzer sits on a tube this much further from the plate,
                        // so its PCB (bent pins underneath) clears the back of the OLED
 buzz_ledge    = 1.5;   // ledge the buzzer rests on (the tube is a sound channel)
 buzz_pcb_dir  = 1;     // (only for the optional post) the module can be turned freely:

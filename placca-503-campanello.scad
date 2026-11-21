@@ -48,15 +48,18 @@ pl_logo_depth = 0.6;   // engraving depth (fill with paint, or leave it plain)
 /* [503 box screws] */
 screw_pitch  = 83.5;  // standard 503 screw spacing
 screw_d      = 3.6;   // through hole
-screw_head_d = 7.6;   // countersink Ø on the face (screw_caps = false), 90°.
-                      // ISO 14581 / DIN 965 M3.5: head 6.9-7.3 mm -> flush
+// screw_caps = false: black M3.5 x 20 countersunk, ISO 14581 T15
+// (STM41 3.5x20 B: head 6.94-7.30 mm, 0.65 mm cylindrical rim, then 90°)
+screw_head_d = 7.3;   // head Ø (max)
+screw_head_c = 0.65;  // cylindrical rim on top of the cone
+screw_head_cl= 0.3;   // diametral clearance: head ~0.15 mm below the face
 // Hidden screws: each head sits in a counterbore closed by a flush printed
 // cap (part = "screw_cap", print 2, same colour as the plate, front face on
 // the bed). A 5 x 1 mm magnet glued in the cap holds it on the steel screw
 // head (stainless screws are not magnetic: use a dot of neutral silicone).
 // Remove it with a pin or a small suction cup. A boss on the back (it fits in
 // the 2.5 mm recess of the box rim) keeps enough plastic under the head.
-screw_caps   = false; // false: black M3.5 x 20 countersunk (ISO 14581 T15)
+screw_caps   = false; // false: flush countersunk screws (see above)
 cb_d         = 7.6;   // counterbore (cheese / pan head up to 7 mm)
 head_h       = 2.2;   // screw head height (MEASURE IT)
 cap_t        = 1.6;   // cap thickness (flush with the plate face)
@@ -239,9 +242,11 @@ module screw_hole() {
         translate([0, 0, -0.01]) cylinder(d = cb_d, h = cap_t + head_h + 0.01);
     } else {
         translate([0, 0, -0.01]) cylinder(d = screw_d, h = plate_t + screw_boss_h + 0.02);
-        // 90° countersink on the front
-        translate([0, 0, -0.01])
-            cylinder(d1 = screw_head_d, d2 = screw_d, h = (screw_head_d - screw_d)/2 + 0.01);
+        // counterbore for the cylindrical rim, then the 90° countersink
+        cs_d = screw_head_d + screw_head_cl;
+        translate([0, 0, -0.01]) cylinder(d = cs_d, h = screw_head_c + 0.02);
+        translate([0, 0, screw_head_c])
+            cylinder(d1 = cs_d, d2 = screw_d, h = (cs_d - screw_d)/2 + 0.01);
     }
 }
 module screw_bosses() {
@@ -263,7 +268,8 @@ module screw_cap() {
 }
 if (screw_caps) echo(str("SCREWS: ", plate_t + screw_boss_h - cap_t - head_h,
          " mm of plastic under the heads; caps: part = screw_cap (print 2)"));
-else echo(str("SCREWS: countersunk, ", plate_t + screw_boss_h - (screw_head_d - screw_d)/2,
+else echo(str("SCREWS: countersunk, ", plate_t + screw_boss_h - screw_head_c
+                                   - (screw_head_d + screw_head_cl - screw_d)/2,
          " mm of plastic under the heads; plastic at the screw ", plate_t + screw_boss_h, " mm"));
 
 module oled_window() {

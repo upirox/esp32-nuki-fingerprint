@@ -65,7 +65,7 @@ Both contacts are closed while the plate is screwed on, so GPIO19 reads LOW. If 
 Two slim patch cables (28 AWG, stranded) run from the indoor enclosure to the plate, labelled **A** and **B**, colours in **T568B** order.
 
 - **At the plate:** the cable wires are soldered (with heat-shrink) to 6-pin JST pigtails **J1–J4**; the mating pigtails go to the parts. Two cable-tie bridges on the back of the plate hold the bundle, so a pull never reaches the solder joints.
-- **In the enclosure:** each cable ends in JST SM wire-to-wire connectors (A: 6 poles, B: 6 + 2 poles) right inside the side slot; the other halves go to the ESP32 terminals. The cables are laid in the slot from the front, already fitted, and a tongue under the lid holds them.
+- **Indoor:** the cable wires (and the two old doorbell wires) are soldered, inside the indoor 503, to three 6-pin JST SM pigtails **A**, **B**, **C** (C: PIR B7, tamper B8, RES and buzzer on the doorbell wires; its red and black are unused). The pigtails run through the cable cover into the enclosure, where they mate right inside the side slot with the halves going to the ESP32 terminals.
 
 | Pair | T568B colour | Cable A | Cable B |
 |---|---|---|---|

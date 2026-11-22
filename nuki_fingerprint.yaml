@@ -82,7 +82,7 @@ substitutions:
   # Installer mode (maintenance): reader off for access, tamper and
   # fingerprint alarms off, display and ring show it. Turned on from HA
   # with a code (action installer_mode), off from HA or on timeout.
-  installer_code: !secret installer_code
+  installer_code: !secret nuki_fingerprint__installer_code   # device-scoped secret (ESPHome dashboard: <host>__<name>)
   installer_minutes: "60"  # it turns itself off after this time
   # Buzzer sounds (RTTTL format: name:d=duration,o=octave,b=bpm:notes)
   tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # access granted

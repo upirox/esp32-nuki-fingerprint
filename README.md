@@ -119,7 +119,7 @@ The doorbell is an `event` entity ("Doorbell") with event type `pressed`.
 
 For maintenance (plate open, wiring, enrolling fingerprints): the reader no longer opens the door, the tamper and fingerprint alarms are off (alarms in progress are cleared), the sensor ring blinks purple, the strip pulses cyan and the display shows "INSTALLATORE" with the remaining time. Enrollment from HA still works. It turns itself off after `installer_minutes` (default 60); if the plate is still open then, the tamper alarm fires as usual. It survives a reboot (the timeout starts over).
 
-- **On:** action `installer_mode` with `enable: true` and the code set as `installer_code` in `secrets.yaml`. A wrong code is logged in "Last Event" and blocks further attempts for 30 s.
+- **On:** action `installer_mode` with `enable: true` and the code set as `nuki_fingerprint__installer_code` in `secrets.yaml` (device-scoped secret, as the ESPHome dashboard names it). A wrong code is logged in "Last Event" and blocks further attempts for 30 s.
 - **Off:** the "Exit Installer Mode" button, or the action with `enable: false` (no code needed). Refused while the plate is open: close it first.
 - State: binary sensor "Installer Mode".
 

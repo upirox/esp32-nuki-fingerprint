@@ -565,8 +565,8 @@ script:
             - globals.set: { id: tamper_latched, value: "false" }
             - switch.template.publish: { id: sw_reader_off, state: OFF }
       - globals.set: { id: failed_attempts, value: "0" }
-      - rtttl.stop: buzzer
-      - rtttl.stop: buzzer_in
+      - rtttl.stop: { id: buzzer }
+      - rtttl.stop: { id: buzzer_in }
       - globals.set: { id: installer_mode, value: "true" }
       - script.execute: installer_timer
       - script.execute: aura_idle

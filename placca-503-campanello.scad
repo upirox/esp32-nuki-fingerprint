@@ -156,7 +156,9 @@ ms_side       = 1;      // 1 = right inner wall (top-right corner), -1 = left
 ms_L          = 28;     // body length (along the depth of the box)
 ms_H          = 16;     // body height: lever side faces the box wall
 ms_T          = 10;     // body thickness (screws go through it)
-ms_y          = 21.5;   // centre of the body thickness (top-left corner of the box)
+ms_y          = 13.5;   // centre of the body thickness (top-left corner of the box, seen from
+                        //  the back). 21.5 was too high: the screw heads on the fin hit the
+                        //  top wall of the box. Body bottom at 8.5: clear of the box screw column
 ms_wall_gap   = 4.5;    // lever face of the body to the box inner wall (1.5 was too tight: bend
                         //  the lever out so its tip still presses on the wall)
 ms_lever_over = 10;     // lever length beyond the front end of the body (cut it)
@@ -197,8 +199,11 @@ rj_post_y     = 21;     // posts at (rj_jack_x - 1, +/- rj_post_y)
 // pigtails go to the parts on the plate. Two bridges on the back, where the
 // RJ45 posts used to be, take a cable tie each: tie the cables / connector
 // bundle there, so a pull on the cables never reaches the solder joints or
-// the parts. [x, y] seen from the street; the tie runs left-right.
-plate_ties = [[0, 21], [0, -21]];   // between the two columns
+// the parts. [x, y, a] seen from the street; a = 0: the tie runs left-right
+// around the bridge, a = 90: up-down. Keep them clear of the R503 nut
+// (~34 mm) and of the display board: the tie needs ~4 mm on both exit sides.
+plate_ties = [[2.5, 20, 90],    // top, between display and PIR: the tie runs up-down
+              [37, -20, 0]];    // bottom-right, near the conduit, clear of the button nut
 
 /* [Seal] */
 seal             = "cord";   // "cord" (rubber cord in the groove), "tpu" or "none"
@@ -416,8 +421,8 @@ rj_x0 = rj_jack_x - rj_len;           // terminal end of the boards
 rj_posts = [[rj_jack_x - 1, rj_post_y], [rj_jack_x - 1, -rj_post_y]];
 
 // bridge for a cable tie on the back: 5 mm wide, 2.5 mm high tunnel
-module plate_tie(x, y) {
-    translate([x, y, plate_t - 0.1]) {
+module plate_tie(x, y, a = 0) {
+    translate([x, y, plate_t - 0.1]) rotate([0, 0, a]) {
         for (sy = [-1, 1]) translate([-1.5, sy*3.5 - 0.9, 0]) cube([3, 1.8, 2.5 + 1.6 + 0.1]);
         translate([-1.5, -4.4, 2.5 + 0.1]) cube([3, 8.8, 1.6]);
     }
@@ -503,7 +508,7 @@ buzzer_mount();
 reed_cradle();
 if (use_ms) microswitch_fin();
 if (use_rj45) rj45_posts();
-for (t = plate_ties) plate_tie(t[0], t[1]);
+for (t = plate_ties) plate_tie(t[0], t[1], len(t) > 2 ? t[2] : 0);
 }
 
 // All x positions in this file are "seen from the street". The front face is

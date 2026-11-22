@@ -111,8 +111,37 @@ On the plate, 3V3 and GND go to a small distribution strip (see `plate-power-str
 | `esphome.nuki_fingerprint_reset_alarm` | |
 | `esphome.nuki_fingerprint_play_indoor` | `tune` (RTTTL string) |
 | `esphome.nuki_fingerprint_stop_indoor` | |
+| `esphome.nuki_fingerprint_installer_mode` | `code` (string), `enable` (true / false) |
 
 The doorbell is an `event` entity ("Doorbell") with event type `pressed`.
+
+### Installer mode
+
+For maintenance (plate open, wiring, enrolling fingerprints): the reader no longer opens the door, the tamper and fingerprint alarms are off (alarms in progress are cleared), the sensor ring blinks purple, the strip pulses cyan and the display shows "INSTALLATORE" with the remaining time. Enrollment from HA still works. It turns itself off after `installer_minutes` (default 60); if the plate is still open then, the tamper alarm fires as usual. It survives a reboot (the timeout starts over).
+
+- **On:** action `installer_mode` with `enable: true` and the code set as `installer_code` in `secrets.yaml`. A wrong code is logged in "Last Event" and blocks further attempts for 30 s.
+- **Off:** the "Exit Installer Mode" button, or the action with `enable: false` (no code needed). Refused while the plate is open: close it first.
+- State: binary sensor "Installer Mode".
+
+To get a popup that asks for the code, add this script to Home Assistant (`scripts.yaml`) and put the script on a dashboard: tapping it opens a dialog with a password field and a "Run" button.
+
+```yaml
+nuki_installer_mode:
+  alias: Installer mode
+  icon: mdi:account-hard-hat
+  fields:
+    code:
+      name: Code
+      required: true
+      selector:
+        text:
+          type: password
+  sequence:
+    - action: esphome.nuki_fingerprint_installer_mode
+      data:
+        code: "{{ code }}"
+        enable: true
+```
 
 Home Assistant entities and texts are in English; the messages on the OLED display are in Italian and can be changed in the display lambda and the `show_msg` calls. Renaming an entity changes its `entity_id` in Home Assistant.
 

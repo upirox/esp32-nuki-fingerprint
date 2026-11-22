@@ -52,12 +52,14 @@
 #    purple, pulsing    = lock jammed
 #    blue, dim          = Nuki unreachable / unknown state
 #    blue, scanning     = fingerprint enrollment in progress
+#    cyan, pulsing      = installer mode
 #  OUTDOOR (fingerprint sensor ring, lit together with the display):
 #    blue               = someone approaching, door locked; enrollment
 #    green, steady      = someone approaching, door already unlocked
 #    green, breathing   = fingerprint accepted
 #    red, short flashes = fingerprint not recognised
 #    red, blinking      = reader blocked: lockout, tamper or disabled from HA
+#    purple, blinking  = installer mode (reader off, alarms off)
 #  The display never shows the lock state (it faces the street).
 #
 #  Home Assistant entities, actions and event texts are in English.
@@ -77,6 +79,11 @@ substitutions:
   max_attempts: "3"        # consecutive wrong fingerprints before the alarm
   lockout_minutes: "15"    # how long the reader stays locked out
   attempts_reset_minutes: "10"  # reset the error count if no other error happens within this time
+  # Installer mode (maintenance): reader off for access, tamper and
+  # fingerprint alarms off, display and ring show it. Turned on from HA
+  # with a code (action installer_mode), off from HA or on timeout.
+  installer_code: !secret installer_code
+  installer_minutes: "60"  # it turns itself off after this time
   # Buzzer sounds (RTTTL format: name:d=duration,o=octave,b=bpm:notes)
   tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # access granted
   tone_fail: "ko:d=8,o=5,b=180:d,p,d"                    # fingerprint rejected
@@ -93,6 +100,8 @@ substitutions:
   # The display no longer shows the lock state (it faces the street): only
   # whoever knows the colour code can tell the door is not locked.
   aura_unlocked_color: GREEN
+  # Ring colour (blinking) in installer mode: a colour used nowhere else
+  aura_installer_color: PURPLE
   # Doorbell (INDOOR only): double ding-dong. Octave 7 (2-2.6 kHz) is where
   # passive buzzers resonate and sound loudest.
   tone_bell: "bell:d=4,o=7,b=100:e,2c,4p,e,2c"
@@ -111,10 +120,20 @@ esphome:
             level: WARN
             format: "State restored at boot: fingerprint lockout=%s, errors=%d, tamper=%s"
             args: [ 'id(locked_out) ? "SI" : "no"', 'id(failed_attempts)', 'id(tamper_latched) ? "SI" : "no"' ]
+        # Installer mode active before the reboot: it goes on, with a new
+        # timeout (the plate is probably open on purpose)
+        - if:
+            condition:
+              lambda: "return id(installer_mode);"
+            then:
+              - logger.log:
+                  level: WARN
+                  format: "Rebooted in installer mode: timeout restarted"
+              - script.execute: installer_timer
         # Plate already open at boot (or wire disconnected): tamper
         - if:
             condition:
-              binary_sensor.is_on: plate_open
+              lambda: "return id(plate_open).state && !id(installer_mode);"
             then:
               - script.execute: tamper_trigger
         # Fingerprint alarm active before the reboot: the lockout starts
@@ -185,6 +204,39 @@ api:
     - action: delete_all
       then:
         - fingerprint_grow.delete_all:
+    # Installer mode. enable: true needs the code (installer_code in
+    # secrets.yaml); enable: false turns it off (code not checked).
+    # After a wrong code, further attempts are refused for 30 s.
+    - action: installer_mode
+      variables:
+        code: string
+        enable: bool
+      then:
+        - if:
+            condition:
+              lambda: "return !enable;"
+            then:
+              - script.execute:
+                  id: installer_exit
+                  expired: false
+            else:
+              - if:
+                  condition:
+                    lambda: |-
+                      static uint32_t blocked_until = 0;
+                      if (millis() < blocked_until) {
+                        ESP_LOGW("installer", "Installer mode: attempt refused, wait 30 s");
+                        return false;
+                      }
+                      if (code != "${installer_code}") {
+                        blocked_until = millis() + 30000;
+                        id(last_event).publish_state("Installer mode: WRONG CODE");
+                        ESP_LOGW("installer", "Installer mode: wrong code");
+                        return false;
+                      }
+                      return true;
+                  then:
+                    - script.execute: installer_enter
     # Cancel the alarm and unlock the reader before the timeout
     - action: reset_alarm
       then:
@@ -409,6 +461,14 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
+  # Installer mode: survives a reboot (the timeout starts over)
+  - id: installer_mode
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: installer_end          # millis() at which it turns itself off
+    type: uint32_t
+    initial_value: "0"
   - id: screen_on              # display on: the sensor ring stays lit
     type: bool
     initial_value: "false"
@@ -487,6 +547,86 @@ script:
           }
           id(bt_t_start) = 0;
 
+  # Installer mode on: clears alarms in progress, reader off for access
+  # (enrollment from HA still works), ring blinking ${aura_installer_color},
+  # display always on with the remaining time.
+  - id: installer_enter
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: "return id(locked_out);"
+          then:
+            - script.execute: alarm_clear
+      - if:
+          condition:
+            lambda: "return id(tamper_latched);"
+          then:
+            - globals.set: { id: tamper_latched, value: "false" }
+            - switch.template.publish: { id: sw_reader_off, state: OFF }
+      - globals.set: { id: failed_attempts, value: "0" }
+      - rtttl.stop: buzzer
+      - rtttl.stop: buzzer_in
+      - globals.set: { id: installer_mode, value: "true" }
+      - script.execute: installer_timer
+      - script.execute: aura_idle
+      - script.execute: restore_strip
+      - script.execute: screen_wake
+      - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_start}" }
+      - text_sensor.template.publish:
+          id: last_event
+          state: "Installer mode ON (alarms off)"
+      - logger.log:
+          level: WARN
+          format: "Installer mode ON for ${installer_minutes} min"
+  - id: installer_timer
+    mode: restart
+    then:
+      - lambda: "id(installer_end) = millis() + ${installer_minutes}UL * 60000UL;"
+      - delay: ${installer_minutes}min
+      - script.execute:
+          id: installer_exit
+          expired: true
+  # Installer mode off. From HA it is refused while the plate is open
+  # (close it first); on timeout it ends anyway and an open plate
+  # triggers the tamper alarm as usual.
+  - id: installer_exit
+    mode: single
+    parameters:
+      expired: bool
+    then:
+      - if:
+          condition:
+            lambda: "return !id(installer_mode);"
+          then:
+            - script.stop: installer_exit
+      - if:
+          condition:
+            lambda: "return !expired && id(plate_open).state;"
+          then:
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Installer mode: close the plate before turning it off"
+            - script.stop: installer_exit
+      - script.stop: installer_timer
+      - globals.set: { id: installer_mode, value: "false" }
+      - text_sensor.template.publish:
+          id: last_event
+          state: !lambda 'return expired ? "Installer mode OFF (timeout)" : "Installer mode OFF";'
+      - logger.log:
+          level: WARN
+          format: "Installer mode OFF"
+      - if:
+          condition:
+            binary_sensor.is_on: plate_open
+          then:
+            - script.execute: tamper_trigger
+          else:
+            - script.execute: aura_idle
+            - script.execute: restore_strip
+            - script.execute: screen_wake
+            - rtttl.play: { id: buzzer, rtttl: "${tone_ok}" }
+
   # Tamper: reader locked, alarm, notification through HA
   - id: tamper_trigger
     mode: single
@@ -512,6 +652,16 @@ script:
   - id: aura_idle
     mode: restart
     then:
+      - if:
+          condition:
+            lambda: "return id(installer_mode) && !id(fp_enrolling).state;"
+          then:
+            - fingerprint_grow.aura_led_control:
+                state: FLASHING
+                speed: 150
+                color: ${aura_installer_color}
+                count: 0          # 0 = forever
+            - script.stop: aura_idle
       - if:
           condition:
             lambda: "return id(locked_out);"
@@ -591,7 +741,7 @@ script:
       - delay: 30s
       - if:
           condition:
-            lambda: "return !id(locked_out) && !id(tamper_latched);"
+            lambda: "return !id(locked_out) && !id(tamper_latched) && !id(installer_mode);"
           then:
             - lambda: "id(oled).turn_off();"
             - globals.set: { id: screen_on, value: "false" }
@@ -626,6 +776,8 @@ script:
           bool alarm = id(locked_out) || id(tamper_latched);
           if (alarm) {
             r = 1; br = 1.0f; fx = "Alarm Blink";         // reader locked out or tamper
+          } else if (id(installer_mode)) {
+            g = 0.8f; b = 1; fx = "Pulse";                 // installer mode: cyan
           } else {
             switch (id(nuki).state) {
               case lock::LOCK_STATE_LOCKED:
@@ -799,7 +951,20 @@ display:
     data_rate: 1MHz           # slower SPI for the 2 m cable
     update_interval: 2s
     lambda: |-
-      if (id(tamper_latched)) {
+      if (id(installer_mode)) {
+        it.filled_rectangle(0, 0, 128, 19);
+        it.print(64, 10, id(font_big), COLOR_OFF, TextAlign::CENTER, "INSTALLATORE");
+        if (id(msg1) != "Appoggia il dito") {
+          // messages during the work (e.g. enrollment)
+          it.print(64, 29, id(font_small), TextAlign::CENTER, id(msg1).c_str());
+          it.print(64, 42, id(font_small), TextAlign::CENTER, id(msg2).c_str());
+        } else {
+          it.print(64, 29, id(font_small), TextAlign::CENTER, "Manutenzione in corso");
+          int32_t left = (int32_t) (id(installer_end) - millis());
+          int mins = left > 0 ? (left + 59999) / 60000 : 0;
+          it.printf(64, 42, id(font_small), TextAlign::CENTER, "Fine tra %d min", mins);
+        }
+      } else if (id(tamper_latched)) {
         it.filled_rectangle(0, 0, 128, 19);
         it.print(64, 10, id(font_big), COLOR_OFF, TextAlign::CENTER, "! ALLARME !");
         it.print(64, 29, id(font_small), TextAlign::CENTER, "Sistema bloccato");
@@ -849,7 +1014,7 @@ fingerprint_grow:
   on_finger_scan_matched:
     - if:
         condition:
-          lambda: "return !id(locked_out) && !id(sw_reader_off).state && confidence >= (int) id(min_confidence).state;"
+          lambda: "return !id(installer_mode) && !id(locked_out) && !id(sw_reader_off).state && confidence >= (int) id(min_confidence).state;"
         then:
           - globals.set:
               id: failed_attempts
@@ -876,7 +1041,7 @@ fingerprint_grow:
           - script.execute: screen_wake
           - if:
               condition:
-                lambda: "return !id(locked_out) && !id(sw_reader_off).state;"
+                lambda: "return !id(installer_mode) && !id(locked_out) && !id(sw_reader_off).state;"
               then:
                 # confidence below threshold: not counted as an error, asks to retry
                 - script.execute:
@@ -901,9 +1066,9 @@ fingerprint_grow:
   on_finger_scan_unmatched:
     - if:
         condition:
-          lambda: "return id(locked_out) || id(sw_reader_off).state;"
+          lambda: "return id(installer_mode) || id(locked_out) || id(sw_reader_off).state;"
         then:
-          # alarm or reader disabled: no counting, just reject
+          # installer mode, alarm or reader disabled: no counting, just reject
           - rtttl.play: { id: buzzer, rtttl: "${tone_fail}" }
           - script.execute: screen_wake
         else:
@@ -1133,7 +1298,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: "return id(booted);"
+            lambda: "return id(booted) && !id(installer_mode);"
           then:
             - script.execute: tamper_trigger
 
@@ -1144,6 +1309,13 @@ binary_sensor:
     name: Plate Tamper
     device_class: tamper
     lambda: "return id(tamper_latched);"
+
+  # Installer mode on/off (turn it on with the installer_mode action)
+  - platform: template
+    id: installer_active
+    name: Installer Mode
+    icon: mdi:account-hard-hat
+    lambda: "return id(installer_mode);"
 
   # Alarm for HA automations (phone notifications)
   - platform: template
@@ -1276,6 +1448,15 @@ button:
             - text_sensor.template.publish:
                 id: last_event
                 state: "Tamper reset, reader re-enabled"
+
+  # Turn installer mode off (refused while the plate is open)
+  - platform: template
+    name: Exit Installer Mode
+    icon: mdi:account-hard-hat-outline
+    on_press:
+      - script.execute:
+          id: installer_exit
+          expired: false
 
   # Button on the device page in HA: cancel the alarm and unlock
   # the reader without waiting ${lockout_minutes} minutes

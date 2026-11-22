@@ -928,6 +928,27 @@ sensor:
       - component.update: batt_percent
       - component.update: power_status
 
+  # TEST ONLY (branch test-battery-ripple, not for main): spread of the
+  # BAT pad voltage over 10 s (50 raw readings, one every 200 ms).
+  # Goal: tell a real cell (steady) from a missing one (charger toggling,
+  # yellow LED flickering).
+  - platform: template
+    name: Backup Battery Ripple
+    unit_of_measurement: V
+    accuracy_decimals: 3
+    entity_category: diagnostic
+    update_interval: 200ms
+    lambda: |-
+      static float lo = 99.0f, hi = 0.0f;
+      static int n = 0;
+      const float v = id(batt_voltage).sample() * 2.0f;
+      if (!isnan(v)) { lo = std::min(lo, v); hi = std::max(hi, v); }
+      if (++n < 50) return {};
+      const float r = hi > lo ? hi - lo : NAN;
+      ESP_LOGI("batt_test", "BAT min %.3f  max %.3f  ripple %.3f V", lo, hi, r);
+      lo = 99.0f; hi = 0.0f; n = 0;
+      return r;
+
   # Percentage estimated from a Li-ion cell discharge curve.
   # On mains power the cell is charging: the percentage is only indicative.
   - platform: template

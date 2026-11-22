@@ -412,6 +412,22 @@ globals:
   - id: screen_on              # display on: the sensor ring stays lit
     type: bool
     initial_value: "false"
+  # Battery health test, run on every mains loss (see batt_test)
+  - id: bt_v_mains             # BAT voltage just before the mains loss
+    type: float
+    initial_value: "NAN"
+  - id: bt_v_start             # on battery, 5 min after the loss
+    type: float
+    initial_value: "0"
+  - id: bt_t_start             # millis() of bt_v_start, 0 = no test running
+    type: uint32_t
+    initial_value: "0"
+  - id: bt_v_last              # latest reading on battery (every 5 min)
+    type: float
+    initial_value: "0"
+  - id: bt_t_last
+    type: uint32_t
+    initial_value: "0"
   - id: msg1
     type: std::string
     initial_value: '"Appoggia il dito"'
@@ -420,6 +436,57 @@ globals:
     initial_value: '"sul lettore"'
 
 script:
+  # Battery health test, started on every mains loss (real blackout or the
+  # breaker switched off on purpose). Two numbers, to compare over time
+  # (the cell always starts the test full, so they are comparable):
+  # - Sag: voltage drop in the first minute on battery (internal resistance)
+  # - Drain Rate: mV per hour from minute 5 to minute 65 (capacity); also
+  #   published when the mains comes back earlier, if it lasted >= 20 min.
+  # A worn pack: both grow. Replace it when the drain rate is ~30% higher
+  # than with the new pack. Compare tests with the same load (display off).
+  - id: batt_test
+    mode: restart
+    then:
+      - lambda: |-
+          id(bt_v_mains) = id(batt_voltage).state;
+          id(bt_t_start) = 0;
+      - delay: 60s
+      - component.update: batt_sample
+      - lambda: |-
+          const float v = id(batt_sample).state;
+          if (!isnan(v) && !isnan(id(bt_v_mains)))
+            id(batt_sag).publish_state((id(bt_v_mains) - v) * 1000.0f);
+      - delay: 4min
+      - component.update: batt_sample
+      - lambda: |-
+          const float v = id(batt_sample).state;
+          if (isnan(v)) return;
+          id(bt_v_start) = id(bt_v_last) = v;
+          id(bt_t_start) = id(bt_t_last) = millis();
+      - repeat:
+          count: 12
+          then:
+            - delay: 5min
+            - component.update: batt_sample
+            - lambda: |-
+                const float v = id(batt_sample).state;
+                if (isnan(v)) return;
+                id(bt_v_last) = v;
+                id(bt_t_last) = millis();
+      - script.execute: batt_test_result
+  - id: batt_test_result
+    mode: single
+    then:
+      - lambda: |-
+          if (id(bt_t_start) == 0) return;
+          const float h = (id(bt_t_last) - id(bt_t_start)) / 3600000.0f;
+          if (h >= 0.25f) {
+            const float rate = (id(bt_v_start) - id(bt_v_last)) * 1000.0f / h;
+            id(batt_drain).publish_state(rate);
+            ESP_LOGI("battery", "Battery test: %.0f mV/h over %.0f min", rate, h * 60.0f);
+          }
+          id(bt_t_start) = 0;
+
   # Tamper: reader locked, alarm, notification through HA
   - id: tamper_trigger
     mode: single
@@ -928,6 +995,41 @@ sensor:
       - component.update: batt_percent
       - component.update: power_status
 
+  # Battery voltage right now: average of 64 raw readings (for the
+  # battery test, updated only by it)
+  - platform: template
+    id: batt_sample
+    internal: true
+    update_interval: never
+    lambda: |-
+      float s = 0; int n = 0;
+      for (int i = 0; i < 64; i++) {
+        const float v = id(batt_voltage).sample();
+        if (!isnan(v)) { s += v; n++; }
+      }
+      if (n == 0) return {};
+      return 2.0f * s / n;                 // 1:2 divider
+
+  # Battery health (see script batt_test): published after each mains loss
+  - platform: template
+    id: batt_sag
+    name: Backup Battery Sag
+    unit_of_measurement: mV
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: mdi:battery-arrow-down
+    entity_category: diagnostic
+    update_interval: never
+  - platform: template
+    id: batt_drain
+    name: Backup Battery Drain Rate
+    unit_of_measurement: mV/h
+    state_class: measurement
+    accuracy_decimals: 0
+    icon: mdi:battery-clock
+    entity_category: diagnostic
+    update_interval: never
+
   # Percentage estimated from a Li-ion cell discharge curve.
   # On mains power the cell is charging: the percentage is only indicative.
   - platform: template
@@ -984,6 +1086,7 @@ binary_sensor:
             - logger.log:
                 level: WARN
                 format: "Mains power lost: power saving mode"
+            - script.execute: batt_test
       # strip, ring and power status always follow, even during boot
       - script.execute: restore_strip
       - component.update: power_status
@@ -1000,6 +1103,13 @@ binary_sensor:
             - text_sensor.template.publish:
                 id: last_event
                 state: "Mains power restored"
+      # battery test cut short by the mains: keep the drain rate if >= 20 min
+      - if:
+          condition:
+            script.is_running: batt_test
+          then:
+            - script.stop: batt_test
+            - script.execute: batt_test_result
       # strip, ring and power status always follow, even during boot
       - script.execute: restore_strip
       - component.update: power_status

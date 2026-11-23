@@ -55,7 +55,7 @@
 #    cyan, pulsing      = installer mode
 #  OUTDOOR (fingerprint sensor ring, lit together with the display):
 #    blue               = someone approaching, door locked
-#    cyan, breathing    = enrollment: ready, place the finger
+#    blue, blinking     = enrollment: ready, place the finger
 #    green, steady      = someone approaching, door already unlocked
 #    green, breathing   = fingerprint accepted
 #    red, short flashes = fingerprint not recognised
@@ -97,8 +97,9 @@ substitutions:
   # The R503 only has fixed colours: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
   # WHITE looks warm; CYAN is the cooler alternative (bluish white).
   aura_presence_color: BLUE
-  # Ring colour while enrolling (ready for the finger): used nowhere else
-  aura_enroll_color: CYAN
+  # Ring colour while enrolling (ready for the finger): blinking, so it
+  # differs from the steady presence colour
+  aura_enroll_color: BLUE
   # Ring colour while the display is on and the lock is UNLOCKED or open.
   # The display no longer shows the lock state (it faces the street): only
   # whoever knows the colour code can tell the door is not locked.
@@ -661,8 +662,8 @@ script:
             lambda: "return id(fp_enrolling).state;"
           then:
             - fingerprint_grow.aura_led_control:
-                state: BREATHING
-                speed: 100
+                state: FLASHING
+                speed: 80
                 color: ${aura_enroll_color}
                 count: 0          # 0 = forever
             - script.stop: aura_idle

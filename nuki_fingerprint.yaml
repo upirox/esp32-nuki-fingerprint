@@ -54,7 +54,8 @@
 #    blue, scanning     = fingerprint enrollment in progress
 #    cyan, pulsing      = installer mode
 #  OUTDOOR (fingerprint sensor ring, lit together with the display):
-#    blue               = someone approaching, door locked; enrollment
+#    blue               = someone approaching, door locked
+#    cyan, breathing    = enrollment: ready, place the finger
 #    green, steady      = someone approaching, door already unlocked
 #    green, breathing   = fingerprint accepted
 #    red, short flashes = fingerprint not recognised
@@ -96,6 +97,8 @@ substitutions:
   # The R503 only has fixed colours: RED, BLUE, PURPLE, GREEN, YELLOW, CYAN, WHITE.
   # WHITE looks warm; CYAN is the cooler alternative (bluish white).
   aura_presence_color: BLUE
+  # Ring colour while enrolling (ready for the finger): used nowhere else
+  aura_enroll_color: CYAN
   # Ring colour while the display is on and the lock is UNLOCKED or open.
   # The display no longer shows the lock state (it faces the street): only
   # whoever knows the colour code can tell the door is not locked.
@@ -654,6 +657,16 @@ script:
     then:
       - if:
           condition:
+            lambda: "return id(fp_enrolling).state;"
+          then:
+            - fingerprint_grow.aura_led_control:
+                state: BREATHING
+                speed: 100
+                color: ${aura_enroll_color}
+                count: 0          # 0 = forever
+            - script.stop: aura_idle
+      - if:
+          condition:
             lambda: "return id(installer_mode) && !id(fp_enrolling).state;"
           then:
             - fingerprint_grow.aura_led_control:
@@ -1107,19 +1120,21 @@ fingerprint_grow:
     - fingerprint_grow.aura_led_control:
         state: FLASHING
         speed: 25
-        color: BLUE
+        color: ${aura_enroll_color}
         count: 2
     - script.execute:
         id: show_msg
         l1: "Registrazione"
         l2: "Togli e riappoggia"
+    - delay: 700ms                 # after the flashes: back to "ready"
+    - script.execute: aura_idle
   on_enrollment_done:
     - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_done}" }
     - fingerprint_grow.aura_led_control:
-        state: BREATHING
-        speed: 100
-        color: BLUE
-        count: 2
+        state: FLASHING
+        speed: 50
+        color: GREEN
+        count: 3
     - script.execute:
         id: show_msg
         l1: "Impronta salvata"
@@ -1361,6 +1376,7 @@ binary_sensor:
       - script.execute: screen_wake
       - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_start}" }
       - script.stop: restore_strip
+      - script.execute: aura_idle          # ring ${aura_enroll_color}: ready
       - script.execute:
           id: show_msg
           l1: "Registrazione"

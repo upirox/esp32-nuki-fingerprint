@@ -85,6 +85,7 @@ substitutions:
   # with a code (action installer_mode), off from HA or on timeout.
   installer_code: !secret nuki_fingerprint__installer_code   # device-scoped secret (ESPHome dashboard: <host>__<name>)
   installer_minutes: "60"  # it turns itself off after this time
+  enroll_timeout: 2min      # an enrollment left waiting is cancelled after this
   # Buzzer sounds (RTTTL format: name:d=duration,o=octave,b=bpm:notes)
   tone_ok: "ok:d=16,o=6,b=180:c,e,g,8c7"                 # access granted
   tone_fail: "ko:d=8,o=5,b=180:d,p,d"                    # fingerprint rejected
@@ -632,6 +633,24 @@ script:
             - script.execute: screen_wake
             - rtttl.play: { id: buzzer, rtttl: "${tone_ok}" }
 
+  # Enrollment left waiting for the finger: cancel it after ${enroll_timeout}
+  - id: enroll_timeout
+    mode: restart
+    then:
+      - delay: ${enroll_timeout}
+      - if:
+          condition:
+            binary_sensor.is_on: fp_enrolling
+          then:
+            - fingerprint_grow.cancel_enroll:
+            - script.execute:
+                id: show_msg
+                l1: "Registrazione"
+                l2: "annullata (tempo)"
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Enrollment cancelled (timeout)"
+
   # Tamper: reader locked, alarm, notification through HA
   - id: tamper_trigger
     mode: single
@@ -756,7 +775,8 @@ script:
       - delay: 30s
       - if:
           condition:
-            lambda: "return !id(locked_out) && !id(tamper_latched) && !id(installer_mode);"
+            # stays on during alarms, installer mode and enrollment
+            lambda: "return !id(locked_out) && !id(tamper_latched) && !id(installer_mode) && !id(fp_enrolling).state;"
           then:
             - lambda: "id(oled).turn_off();"
             - globals.set: { id: screen_on, value: "false" }
@@ -1378,6 +1398,7 @@ binary_sensor:
       - script.execute: screen_wake
       - rtttl.play: { id: buzzer, rtttl: "${tone_enroll_start}" }
       - script.stop: restore_strip
+      - script.execute: enroll_timeout
       - script.execute: aura_idle          # ring ${aura_enroll_color}: ready
       - script.execute:
           id: show_msg
@@ -1392,9 +1413,11 @@ binary_sensor:
           effect: Scan
     # When enrollment ends, fails or is cancelled, go back to the state colour
     on_release:
+      - script.stop: enroll_timeout
       - delay: 2s
       - script.execute: restore_strip
       - script.execute: aura_idle
+      - script.execute: screen_wake        # the usual 30 s, then off
 
 switch:
   # Disable the reader from HA: fingerprints are ignored, the ring blinks
@@ -1437,6 +1460,24 @@ switch:
                       state: "Reader re-enabled from Home Assistant"
 
 button:
+  # Stop an enrollment in progress (same as the cancel_enroll action)
+  - platform: template
+    name: Cancel Enrollment
+    icon: mdi:fingerprint-off
+    on_press:
+      - if:
+          condition:
+            binary_sensor.is_on: fp_enrolling
+          then:
+            - fingerprint_grow.cancel_enroll:
+            - script.execute:
+                id: show_msg
+                l1: "Registrazione"
+                l2: "annullata"
+            - text_sensor.template.publish:
+                id: last_event
+                state: "Enrollment cancelled"
+
   # Ring the doorbell on the indoor buzzer (test / call from HA)
   - platform: template
     name: Ring Indoor Chime

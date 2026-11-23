@@ -105,7 +105,7 @@ On the plate, 3V3 and GND go to a small distribution strip (see `plate-power-str
 | Action | Data |
 |---|---|
 | `esphome.nuki_fingerprint_enroll` | `finger_id`, `num_scans` |
-| `esphome.nuki_fingerprint_cancel_enroll` | | (also the "Cancel Enrollment" button; an enrollment left waiting is cancelled after 2 min)
+| `esphome.nuki_fingerprint_cancel_enroll` | none (also the "Cancel Enrollment" button; an enrollment left waiting is cancelled after 2 min) |
 | `esphome.nuki_fingerprint_delete` | `finger_id` |
 | `esphome.nuki_fingerprint_delete_all` | |
 | `esphome.nuki_fingerprint_reset_alarm` | |

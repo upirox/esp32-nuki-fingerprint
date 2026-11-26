@@ -432,7 +432,8 @@ rtttl:
   # Outdoor (plate): feedback for whoever is at the door, deterrent siren
   - id: buzzer
     output: buzzer_out
-    gain: 50%            # volume: 50% = maximum (duty cycle); lower = quieter
+    gain: 10%            # volume: 50% = maximum (duty cycle); 10% = audible only
+                         # near the plate (at 50% it carried too far)
   # Indoor (next to the ESP32): doorbell and alarms for whoever is home
   - id: buzzer_in
     output: buzzer_in_out

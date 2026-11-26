@@ -433,7 +433,10 @@ rtttl:
   - id: buzzer
     output: buzzer_out
     gain: 10%            # volume: 50% = maximum (duty cycle); 10% = audible only
-                         # near the plate (at 50% it carried too far)
+                         # near the plate (at 50% it carried too far).
+                         # The alarm siren plays at 50% (see tone_alarm).
+    on_finished_playback:  # back to the quiet volume after the siren
+      - lambda: "id(buzzer).set_gain(0.10f);"
   # Indoor (next to the ESP32): doorbell and alarms for whoever is home
   - id: buzzer_in
     output: buzzer_in_out
@@ -661,6 +664,7 @@ script:
       - script.execute: aura_idle
       - script.execute: restore_strip            # indoor strip: red blinking
       - script.execute: screen_wake
+      - lambda: "id(buzzer).set_gain(0.50f);"    # siren at full volume outside too
       - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
@@ -879,6 +883,7 @@ script:
           color: RED
           count: 0
       - component.update: oled
+      - lambda: "id(buzzer).set_gain(0.50f);"    # siren at full volume outside too
       - rtttl.play: { id: buzzer, rtttl: "${tone_alarm}" }
       - rtttl.play: { id: buzzer_in, rtttl: "${tone_alarm}" }   # warn indoors too
       - text_sensor.template.publish:
